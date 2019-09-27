@@ -1,0 +1,157 @@
+starting worker pid=10940 on localhost:11441 at 12:26:05.687
+starting worker pid=10676 on localhost:11441 at 12:26:05.900
+starting worker pid=20020 on localhost:11441 at 12:26:06.111
+starting worker pid=3384 on localhost:11441 at 12:26:06.398
+starting worker pid=8968 on localhost:11441 at 12:26:06.620
+starting worker pid=26608 on localhost:11441 at 12:26:06.852
+starting worker pid=1168 on localhost:11441 at 12:26:07.052
+starting worker pid=22436 on localhost:11441 at 12:26:07.275
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+
+Attaching package: 'dplyr'
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+Warning messages:
+1: package 'RPostgres' was built under R version 3.5.3 
+2: package 'glue' was built under R version 3.5.3 
+Warning messages:
+es' was built under R version 3.5.3 
+3: package 'dplyr' was built under R version 3.5.3 
+2: package 'glue' was built under R version 3.5.3 
+.3 
+2: package 'glue' was built under R version 3.5.3 
+3: package 'dplyr' was built under R version 3.5.3 
+Warning messages:
+3: package 'dplyr' was built under R version 3.5.3 
+3 
+2: package 'glue' was built under R version 3.5.3 
+3: package 'dplyr' was built under R version 3.5.3 
+1: package 'RPostgres' was built under R version 3.5.3 
+2: package 'glue' was built under R version 3.5.3 
+3: package 'dplyr' was built under R version 3.5.3 
+Warning messages:
+Warning messages:
+es' was built under R version 3.5.3 
+2: package 'glue' was built under R version 3.5.3 
+3: package 'dplyr' was built under R version 3.5.3 
+3 
+2: package 'glue' was built under R version 3.5.3 
+3: package 'dplyr' was built under R version 3.5.3 
+1: package 'RPostgres' was built under R version 3.5.3 
+2: package 'glue' was built under R version 3.5.3 
+3: package 'dplyr' was built under R version 3.5.3 
