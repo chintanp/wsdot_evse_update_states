@@ -27,7 +27,7 @@ ncores <- parallel::detectCores()
 # Make a cluster and define and file to redirect stdout etc. from workers
 cl <-
   parallel::makeCluster(ncores, outfile = paste0(
-    "log_trip_inf_",
+    "log_update_cd_",
     format(Sys.time(), "%Y-%m-%d-%H-%M-%S"),
     ".txt"
   ))
@@ -64,14 +64,13 @@ main_con <- DBI::dbConnect(
 
 query_nevses <-
   paste0("select * from new_evses where analysis_id = ", a_id)
-res_nevses <- DBI::dbSendQuery(main_con, query_nevses)
-nevses <- DBI::dbFetch(res_nevses)
-DBI::dbClearResult(res_nevses)
+
+nevses <- DBI::dbGetQuery(main_con, query_nevses)
+
 
 query_bevses <- "select * from built_evse"
-res_bevses <- DBI::dbSendQuery(main_con, query_bevses)
-bevses <- DBI::dbFetch(res_bevses)
-DBI::dbClearResult(res_bevses)
+
+bevses <- DBI::dbGetQuery(main_con, query_bevses)
 
 bevses <-
   bevses[, c("bevse_id",
@@ -106,8 +105,9 @@ nevses$nevse_id <- NULL
 nevses$chademo_plug_count <- NULL
 nevses$combo_plug_count <- NULL
 
-evses_now <- rbind(evses_now, nevses, overwrite = TRUE)
+evses_now <- rbind(evses_now, nevses)
 
+DBI::dbWriteTable(main_con, paste0("evses_now", a_id), evses_now, overwrite = FALSE)
 # Make a unique table for each aalysis_id and drop if after the analysis is complete
 # dbWriteTable(main_con, "evses_now", evses_now)
 
@@ -120,10 +120,13 @@ cd_combo_g$ST_Length <- NULL
 cd_combo_g$subs <- NULL
 
 # Specify the variables that the workers need access to
-parallel::clusterExport(cl,
-                        c('LOOKUP_DISTANCE',
-                          'CRITICAL_DISTANCE',
-                          'cd_chademo_g'))
+# parallel::clusterExport(cl,
+#                         c('LOOKUP_DISTANCE',
+#                           'CRITICAL_DISTANCE',
+#                           'cd_chademo_g', 
+#                           'cd_combo_g', 
+#                           'chademo_ods', 
+#                           'combo_ods'))
 
 # Find the roads closest to the new evses (one for each)
 i = 1
@@ -142,9 +145,24 @@ for (i in 1:nrow(nevses)) {
   # Get all the OD pairs who charging-distance geo is within 10 miles of the new charging station location
   chademo_ods <- DBI::dbGetQuery(main_con, query_od_chademo)
   
+  # Specify the variables that the workers need access to
+  parallel::clusterExport(cl,
+                          c('LOOKUP_DISTANCE',
+                            'CRITICAL_DISTANCE',
+                            'cd_chademo_g', 
+                            'cd_combo_g', 
+                            'chademo_ods'))
+  
   if (nrow(chademo_ods) > 0) {
     # Find the new charging distance for the OD pairs using the new fleet of EVSEs
-    for (j in 1:nrow(chademo_ods)) {
+    foreach::foreach(
+      j = 1:nrow(chademo_ods),
+      .inorder = FALSE,
+      .noexport = "main_con",
+      .combine = "rbind"
+    ) %dopar% {
+      print(paste0("In chademo j is: ", j, " of ", nrow(chademo_ods)))
+      
       orig_j <- chademo_ods$origin[j]
       dest_j <- chademo_ods$destination[j]
       
@@ -159,7 +177,9 @@ for (i in 1:nrow(nevses)) {
         dest_j,
         ') as line,
       ST_SetSRID(ST_MakePoint("longitude", "latitude" ), 4326) as pta
-      from evses_now where ("connector_code" = 1 OR "connector_code" = 3) AND st_dwithin(ST_GeogFromWKB(ST_SetSRID(ST_MakePoint("longitude", "latitude" ), 4326)), ST_GeogFromWKB((select sp_od2(',
+      from ',
+        paste0("evses_now", a_id),
+        ' where ("connector_code" = 1 OR "connector_code" = 3) AND st_dwithin(ST_GeogFromWKB(ST_SetSRID(ST_MakePoint("longitude", "latitude" ), 4326)), ST_GeogFromWKB((select sp_od2(',
         orig_j,
         ',',
         dest_j,
@@ -169,6 +189,7 @@ for (i in 1:nrow(nevses)) {
       )
       
       rat_chademo <- DBI::dbGetQuery(main_con, query_chademo)
+      print("query_chadmeo done")
       # Find the successive difference in ratios
       rat_chademo <-
         dplyr::as_tibble(rat_chademo) %>% mutate(diff_chademo = ratios - lag(ratios))
@@ -180,8 +201,8 @@ for (i in 1:nrow(nevses)) {
         ind_maxes <- c(max_index - 1, max_index)
         
         query_chademo2 <- paste0(
-          'select ST_Length(ST_GeographyFromText(subs)), subs
-        from (select st_astext(st_LineSubstring(line, pta, ptb)) as subs
+          'select ST_Length(subs::geography), subs::geography
+        from (select st_LineSubstring(line, pta, ptb) as subs
         from (select sp_od2(',
           orig_j,
           ',',
@@ -199,6 +220,8 @@ for (i in 1:nrow(nevses)) {
       
       cd_chademo_g <- DBI::dbGetQuery(main_con, query_chademo2)
       
+      print("query_chadmeo2 done")
+      
       query_insert <-
         paste0(
           'insert into od_cd (origin, destination, cd_chademo, cd_chademo_geog, analysis_id) values (',
@@ -206,15 +229,16 @@ for (i in 1:nrow(nevses)) {
           ', ',
           dest_j,
           ', ',
-          cd_chademo_g$ST_Length,
-          ', ',
+          cd_chademo_g$st_length * 0.000621371,
+          ", '",
           cd_chademo_g$subs,
-          ', ',
+          "', ",
           a_id,
           ');'
         )
       
-      
+      DBI::dbGetQuery(main_con, query_insert)
+      print("query_insert done")
     }
   }
   
@@ -232,9 +256,24 @@ for (i in 1:nrow(nevses)) {
   # Get all the OD pairs who charging-distance geo is within 10 miles of the new charging station location
   combo_ods <- DBI::dbGetQuery(main_con, query_combo_od)
   
+  # Specify the variables that the workers need access to
+  parallel::clusterExport(cl,
+                          c('LOOKUP_DISTANCE',
+                            'CRITICAL_DISTANCE',
+                            'cd_chademo_g', 
+                            'cd_combo_g', 
+                            'combo_ods'))
+  
   if (nrow(combo_ods) > 0) {
     # Find the new charging distance for the OD pairs using the new fleet of EVSEs
-    for (k in 1:nrow(combo_ods)) {
+    foreach::foreach(
+      k = 1:nrow(combo_ods),
+      .inorder = FALSE,
+      .noexport = "main_con",
+      .combine = "rbind"
+    ) %dopar% {
+      print(paste0("In combo k is: ", k, " of ", nrow(combo_ods)))
+      
       orig_k <- combo_ods$origin[k]
       dest_k <- combo_ods$destination[k]
       
@@ -249,7 +288,9 @@ for (i in 1:nrow(nevses)) {
         dest_k,
         ') as line,
       ST_SetSRID(ST_MakePoint("longitude", "latitude" ), 4326) as pta
-      from evses_now where ("connector_code" = 2 OR "connector_code" = 3) AND st_dwithin(ST_GeogFromWKB(ST_SetSRID(ST_MakePoint("longitude", "latitude" ), 4326)), ST_GeogFromWKB((select sp_od2(',
+      from ',
+        paste0("evses_now", a_id),
+        ' where ("connector_code" = 2 OR "connector_code" = 3) AND st_dwithin(ST_GeogFromWKB(ST_SetSRID(ST_MakePoint("longitude", "latitude" ), 4326)), ST_GeogFromWKB((select sp_od2(',
         orig_k,
         ',',
         dest_k,
@@ -259,6 +300,8 @@ for (i in 1:nrow(nevses)) {
       )
       
       rat_combo <- DBI::dbGetQuery(main_con, query_combo)
+      
+      print("query_combo done")
       # Find the successive difference in ratios
       rat_combo <-
         dplyr::as_tibble(rat_combo) %>% mutate(diff_combo = ratios - lag(ratios))
@@ -270,8 +313,8 @@ for (i in 1:nrow(nevses)) {
         ind_maxes <- c(max_index - 1, max_index)
         
         query_combo2 <- paste0(
-          'select ST_Length(ST_GeographyFromText(subs)), subs
-        from (select st_astext(st_LineSubstring(line, pta, ptb)) as subs
+          'select ST_Length(subs::geography), subs::geography
+        from (select st_LineSubstring(line, pta, ptb) as subs
         from (select sp_od2(',
           orig_k,
           ',',
@@ -290,16 +333,30 @@ for (i in 1:nrow(nevses)) {
       cd_combo_g <-
         DBI::dbGetQuery(main_con, query_combo2)
       
-      query_update <- paste0('update od_cd set cd_combo = ', cd_combo_g$ST_Length, ', cd_combo_geog = ', cd_combo_g$subs, ' where analysis_id = ', a_id, ' and origin = ', orig_k, ' and destination = ', dest_k, ';')
+      print("query_combo2 done")
+      query_update <-
+        paste0(
+          'update od_cd set cd_combo = ',
+          cd_combo_g$st_length * 0.000621371,
+          ", cd_combo_geog = '",
+          cd_combo_g$subs,
+          "' where analysis_id = ",
+          a_id,
+          ' and origin = ',
+          orig_k,
+          ' and destination = ',
+          dest_k,
+          ';'
+        )
       
       DBI::dbGetQuery(main_con, query_update)
+      print("query_update done")
       
     }
   }
 }
 
+DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
 
-
-
-# stopCluster(cl)
-# stopImplicitCluster()
+stopCluster(cl)
+stopImplicitCluster()

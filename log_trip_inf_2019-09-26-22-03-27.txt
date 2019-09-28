@@ -1,56 +1,11 @@
-starting worker pid=22448 on localhost:11757 at 16:08:36.328
-starting worker pid=11640 on localhost:11757 at 16:08:36.612
-starting worker pid=13824 on localhost:11757 at 16:08:36.924
-starting worker pid=18596 on localhost:11757 at 16:08:37.208
-starting worker pid=3268 on localhost:11757 at 16:08:37.484
-starting worker pid=24260 on localhost:11757 at 16:08:37.773
-starting worker pid=26768 on localhost:11757 at 16:08:38.056
-starting worker pid=21220 on localhost:11757 at 16:08:38.342
-
-Attaching package: 'dplyr'
-
-The following object is masked from 'package:glue':
-
-    collapse
-
-The following objects are masked from 'package:stats':
-
-    filter, lag
-
-The following objects are masked from 'package:base':
-
-    intersect, setdiff, setequal, union
-
-
-Attaching package: 'dplyr'
-
-The following object is masked from 'package:glue':
-
-    collapse
-
-The following objects are masked from 'package:stats':
-
-    filter, lag
-
-The following objects are masked from 'package:base':
-
-    intersect, setdiff, setequal, union
-
-
-Attaching package: 'dplyr'
-
-The following object is masked from 'package:glue':
-
-    collapse
-
-The following objects are masked from 'package:stats':
-
-    filter, lag
-
-The following objects are masked from 'package:base':
-
-    intersect, setdiff, setequal, union
-
+starting worker pid=29988 on localhost:11757 at 22:03:27.499
+starting worker pid=28308 on localhost:11757 at 22:03:27.708
+starting worker pid=12536 on localhost:11757 at 22:03:28.029
+starting worker pid=31560 on localhost:11757 at 22:03:28.267
+starting worker pid=31108 on localhost:11757 at 22:03:28.502
+starting worker pid=30716 on localhost:11757 at 22:03:28.785
+starting worker pid=16176 on localhost:11757 at 22:03:29.010
+starting worker pid=22456 on localhost:11757 at 22:03:29.228
 
 Attaching package: 'dplyr'
 
@@ -99,6 +54,9 @@ The following objects are masked from 'package:base':
 
 Attaching package: 'dplyr'
 
+
+Attaching package: 'dplyr'
+
 The following object is masked from 'package:glue':
 
     collapse
@@ -118,6 +76,51 @@ The following objects are masked from 'package:stats':
 The following objects are masked from 'package:base':
 
     intersect, setdiff, setequal, union
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
 
 The following objects are masked from 'package:base':
 
