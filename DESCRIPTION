@@ -1,0 +1,29 @@
+Package: update.states
+Title: This package has scripts to update the relevant states
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Chintan",
+           family = "Pathak",
+           role = c("aut", "cre"),
+           email = "cp84@uw.edu",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: What the package does (one paragraph).
+License: MIT License + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    data.table (>= 1.12.3),
+    rapportools,
+    dplyr,
+    RPostgres,
+    DBI,
+    doParallel,
+    lgr,
+    jsonlite,
+    rotor,
+    lubridate,
+    stats,
+    testthat,
+    utils,
+    roxygen2
+RoxygenNote: 6.1.1
