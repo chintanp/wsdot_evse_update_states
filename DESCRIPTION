@@ -25,5 +25,9 @@ Imports:
     stats,
     testthat,
     utils,
-    roxygen2
+    roxygen2,
+    magrittr,
+    rlang,
+    config
 RoxygenNote: 6.1.1
+StagedInstall: no 

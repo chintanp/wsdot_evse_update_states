@@ -36,4 +36,78 @@ testthat::test_that("make_trip_row returns a dataframe row with required columns
     trip_dc = test_trip_dc1
   )), c('dist', 'dest_charger_L2', 'dest_charger', 'max_spacing', 'gas_price'))
 
+  test_gas_prices2 <- data.frame(zip = 98001, avg_gas_price = 4.56)
+  test_trip_EV_row2 <-
+    data.frame(connector_code = 2, origin_zip = 98001)
+  test_trip_cd2 <- data.frame()
+  test_trip_sp2 <- data.frame(shortest_path_length = 234.56)
+  test_trip_dc2 <-
+    data.frame(dc_combo = 1,
+               dc_chademo = 0,
+               dc_level2 = 0)
+
+  testthat::expect_is(
+    make_trip_row(
+      gas_prices = test_gas_prices2,
+      trip_EV_row = test_trip_EV_row2,
+      trip_sp = test_trip_sp2,
+      trip_cd = test_trip_cd2,
+      trip_dc = test_trip_dc2
+    ),
+    "data.frame"
+  )
+
+  testthat::expect_equal(nrow(make_trip_row(
+    gas_prices = test_gas_prices1,
+    trip_EV_row = test_trip_EV_row2,
+    trip_sp = test_trip_sp2,
+    trip_cd = test_trip_cd2,
+    trip_dc = test_trip_dc2
+  )), 1)
+
+  testthat::expect_setequal(colnames(make_trip_row(
+    gas_prices = test_gas_prices2,
+    trip_EV_row = test_trip_EV_row2,
+    trip_sp = test_trip_sp2,
+    trip_cd = test_trip_cd2,
+    trip_dc = test_trip_dc2
+  )), c('dist', 'dest_charger_L2', 'dest_charger', 'max_spacing', 'gas_price'))
+
+  test_gas_prices3 <- data.frame(zip = 98001, avg_gas_price = 4.56)
+  test_trip_EV_row3 <-
+    data.frame(connector_code = 4, origin_zip = 98001)
+  test_trip_cd3 <- data.frame(cd_chadem0 = 43.67, cd_combo = 67.89)
+  test_trip_sp3 <- data.frame(shortest_path_length = 234.56)
+  test_trip_dc3 <-
+    data.frame(dc_combo = 1,
+               dc_chademo = 0,
+               dc_level2 = 0)
+
+  testthat::expect_is(
+    make_trip_row(
+      gas_prices = test_gas_prices3,
+      trip_EV_row = test_trip_EV_row3,
+      trip_sp = test_trip_sp3,
+      trip_cd = test_trip_cd3,
+      trip_dc = test_trip_dc3
+    ),
+    "data.frame"
+  )
+
+  testthat::expect_equal(nrow(make_trip_row(
+    gas_prices = test_gas_prices3,
+    trip_EV_row = test_trip_EV_row3,
+    trip_sp = test_trip_sp3,
+    trip_cd = test_trip_cd3,
+    trip_dc = test_trip_dc3
+  )), 1)
+
+  testthat::expect_setequal(colnames(make_trip_row(
+    gas_prices = test_gas_prices3,
+    trip_EV_row = test_trip_EV_row3,
+    trip_sp = test_trip_sp3,
+    trip_cd = test_trip_cd3,
+    trip_dc = test_trip_dc3
+  )), c('dist', 'dest_charger_L2', 'dest_charger', 'max_spacing', 'gas_price'))
+
 })

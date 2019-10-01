@@ -1,2 +1,4 @@
 ^update\.states\.Rproj$
 ^\.Rproj\.user$
+tic.R
+.travis.yml
