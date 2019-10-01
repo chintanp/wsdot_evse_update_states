@@ -40,3 +40,5 @@
 {"level":400,"timestamp":"2019-09-30 16:38:29","logger":"test","caller":"eval","msg":"new run"}
 {"level":400,"timestamp":"2019-09-30 16:38:49","logger":"test","caller":"eval","msg":"new run"}
 {"level":400,"timestamp":"2019-09-30 16:39:35","logger":"test","caller":"eval","msg":"new run"}
+{"level":400,"timestamp":"2019-09-30 18:51:11","logger":"test","caller":"eval","msg":"new run"}
+{"level":400,"timestamp":"2019-09-30 18:53:04","logger":"test","caller":"eval","msg":"new run"}

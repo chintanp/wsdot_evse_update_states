@@ -19,13 +19,13 @@ usePackage('lgr')
 usePackage('jsonlite')
 usePackage('rotor')
 
-main_con <- DBI::dbConnect(
-    RPostgres::Postgres(),
-    host = Sys.getenv("MAIN_HOST"),
-    dbname = Sys.getenv("MAIN_DB"),
-    user = Sys.getenv("MAIN_USER"),
-    password = Sys.getenv("MAIN_PWD")
-)
+# main_con <- DBI::dbConnect(
+#     RPostgres::Postgres(),
+#     host = Sys.getenv("MAIN_HOST"),
+#     dbname = Sys.getenv("MAIN_DB"),
+#     user = Sys.getenv("MAIN_USER"),
+#     password = Sys.getenv("MAIN_PWD")
+# )
 
 lg <- get_logger("test")$set_propagate(FALSE)$set_appenders(list(
     rotating = AppenderFileRotatingTime$new(
