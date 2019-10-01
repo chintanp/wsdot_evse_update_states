@@ -1,4 +1,4 @@
-a_id <- 14 #args[2]
+a_id <- 27 #args[2]
 
 # setwd(basedir)
 source('config.R')
@@ -15,15 +15,28 @@ usePackage("dplyr")
 usePackage("RPostgres")
 usePackage("DBI")
 usePackage("doParallel")
+usePackage('lgr')
+usePackage('jsonlite')
+usePackage('rotor')
 
 main_con <- DBI::dbConnect(
     RPostgres::Postgres(),
-    host = "localhost",
-    dbname = "wsdot_evse_main",
-    user = Sys.getenv("MAIN_USERNAME"),
+    host = Sys.getenv("MAIN_HOST"),
+    dbname = Sys.getenv("MAIN_DB"),
+    user = Sys.getenv("MAIN_USER"),
     password = Sys.getenv("MAIN_PWD")
 )
 
+lg <- get_logger("test")$set_propagate(FALSE)$set_appenders(list(
+    rotating = AppenderFileRotatingTime$new(
+        file = "./logs/gen_evtrip.json",
+        age = "1 day",
+        layout = LayoutJson$new()
+    )
+))
+
+lg$set_threshold("info")
+lg$info(msg = "new run")
 # Get the constants from the config file
 # config <- config::get()
 
@@ -202,17 +215,25 @@ create_departure_df <- function(od, all_trips_sp_df) {
 #'@return The selected trip EVs from the set of EVs at source
 #'
 get_tripEVs_from_sourceEVs <- function(trips_source_i, source_EVs) {
-    # If we have more trips than EVs, then EVs will need to reselected, or
-    # Some EVs are making more than one trip - so we se random draw *with* replacement
+    # An EV cannot make two trips in a day
+    lg$debug(msg = paste0(
+        "trips_source_i: ",
+        trips_source_i,
+        " count source_EVs: ",
+        nrow(source_EVs)
+    ))
     if (trips_source_i > nrow(source_EVs)) {
-        # Randomly pick EVs from the relevant EVs "with replacement"
-        trip_EVs <-
-            dplyr::sample_n(source_EVs, trips_source_i, replace = TRUE)
-    } else {
-        # Randomly pick EVs from the relevant EVs "without replacement"
-        trip_EVs <-
-            dplyr::sample_n(source_EVs, trips_source_i, replace = FALSE)
+        trips_source_i <- nrow(source_EVs)
+        lg$fatal(msg = paste0(
+            nrow(source_EVs),
+            " source_EVs less than ",
+            trips_source_i,
+            " trips_source_i"
+        ))
     }
+    # Randomly pick EVs from the relevant EVs "without replacement"
+    trip_EVs <-
+        dplyr::sample_n(source_EVs, trips_source_i, replace = FALSE)
     
     return(trip_EVs)
 }
@@ -236,20 +257,20 @@ assign_OD_details <-
         
         trip_EVs_OD$destination_zip <-
             destination_zip
-        # Find origin and destination lat,lngs
-        olatLong <-
-            zipcode[zipcode$zip == origin_zip, 4:5]
-        trip_EVs_OD$Origin_Lat <-
-            olatLong$latitude
-        trip_EVs_OD$Origin_Lon <-
-            olatLong$longitude
-        
-        dlatLong <-
-            zipcode[zipcode$zip == destination_zip, 4:5]
-        trip_EVs_OD$Destination_Lat <-
-            dlatLong$latitude
-        trip_EVs_OD$Destination_Lon <-
-            dlatLong$longitude
+        # # Find origin and destination lat,lngs
+        # olatLong <-
+        #     zipcode[zipcode$zip == origin_zip, 4:5]
+        # trip_EVs_OD$Origin_Lat <-
+        #     olatLong$latitude
+        # trip_EVs_OD$Origin_Lon <-
+        #     olatLong$longitude
+        # 
+        # dlatLong <-
+        #     zipcode[zipcode$zip == destination_zip, 4:5]
+        # trip_EVs_OD$Destination_Lat <-
+        #     dlatLong$latitude
+        # trip_EVs_OD$Destination_Lon <-
+        #     dlatLong$longitude
         
         return(trip_EVs_OD)
     }
@@ -280,49 +301,89 @@ get_Gas_Price <- function(gas_prices, origin_zip) {
 #' @param trip_sp Dataframe containing trip shortest_path
 #' @param trip_cd Dataframe with trip charging_distances
 #' @param trip_dc Dataframe with trip destination chargers
-#' 
+#'
 #'
 #' @return The dataframe with EV specific trip details
 #'
-make_trip_row <- function(gas_prices, trip_EV_row, trip_sp, trip_cd, trip_dc) {
-    if (trip_EV_row$connector_code == 1) {
-        max_spacing <- trip_cd$cd_chademo # in miles
+make_trip_row <-
+    function(gas_prices,
+             trip_EV_row,
+             trip_sp,
+             trip_cd,
+             trip_dc) {
+        lg$debug(
+            trip_EV_row = trip_EV_row,
+            trip_sp = trip_sp,
+            trip_cd = trip_cd,
+            trip_dc = trip_dc,
+            msg = "in make_trip_row"
+        )
+        # trip_cd is null, then give it path length
+        if (rapportools::is.empty(trip_cd$cd_chademo)) {
+            lg$fatal(msg = paste("cd_chademo is null"),
+                     trip_EV_row = trip_EV_row)
+            # In case the dataframe is empty create a new dataframe and add columns
+            # trip_cd <- data.frame()
+            # browser()
+            trip_cd$cd_chademo <- numeric(nrow(trip_cd))
+            trip_cd[1, 'cd_chademo'] <-
+                trip_sp$shortest_path_length[1]
+        }
+        if (rapportools::is.empty(trip_cd$cd_combo)) {
+            lg$fatal(msg = paste("cd_combo is null"),
+                     trip_EV_row = trip_EV_row)
+            #  browser()
+            trip_cd$cd_combo <- numeric(nrow(trip_cd))
+            trip_cd[1, 'cd_combo'] <-
+                trip_sp$shortest_path_length[1]
+        }
+        
+        if (trip_EV_row$connector_code == 1) {
+            max_spacing <- trip_cd$cd_chademo # in miles
+            dest_charger <-
+                trip_dc$dc_chademo
+        } else if (trip_EV_row$connector_code == 2) {
+            max_spacing <- trip_cd$cd_combo
+            dest_charger <-
+                trip_dc$dc_combo
+        } else {
+            # Need to replace this with Tesla Superchargers
+            max_spacing <-
+                base::min(trip_cd$cd_chademo ,
+                          trip_cd$cd_combo)
+            dest_charger <-
+                trip_dc$dc_chademo |
+                trip_dc$dc_combo
+        }
+        
+        dest_charger_L2 <-
+            ifelse(is.na(trip_dc$dc_level2),
+                   0,
+                   trip_dc$dc_level2)
         dest_charger <-
-            trip_dc$dc_chademo
-    } else if (trip_EV_row$connector_code == 2) {
-        max_spacing <- trip_cd$cd_combo
-        dest_charger <-
-            trip_dc$dc_combo 
-    } else {
-        # Need to replace this with Tesla Superchargers
-        max_spacing <-
-            base::min(trip_cd$cd_chademo ,
-                      trip_cd$cd_combo )
-        dest_charger <-
-            trip_dc$dc_chademo |
-            trip_dc$dc_combo
+            ifelse(is.na(dest_charger), 0, dest_charger)
+        
+        gas_price <-
+            get_Gas_Price(gas_prices = gas_prices, origin_zip = trip_EV_row$origin_zip)
+        
+        lg$debug(
+            shortest_path_length = trip_sp$shortest_path_length,
+            dest_charger_L2 = dest_charger_L2,
+            dest_charger = dest_charger,
+            max_spacing = max_spacing,
+            gas_prices = gas_price,
+            msg = "Debugging make_trip_row"
+        )
+        trip_row <- data.frame(
+            dist = trip_sp$shortest_path_length,
+            dest_charger_L2 = dest_charger_L2,
+            dest_charger = dest_charger,
+            max_spacing = max_spacing,
+            gas_price = gas_price
+        )
+        
+        return(trip_row)
     }
-    
-    dest_charger_L2 <-
-        ifelse(is.na(trip_dc$dc_level2),
-               0,
-               trip_dc$dc_level2)
-    dest_charger <-
-        ifelse(is.na(dest_charger), 0, dest_charger)
-    
-    gas_price <-
-        get_Gas_Price(gas_prices = gas_prices, origin_zip = trip_EV_row$origin_zip)
-    
-    trip_row <- data.frame(
-        dist = trip_sp$shortest_path_length,
-        dest_charger_L2 = dest_charger_L2,
-        dest_charger = dest_charger,
-        max_spacing = max_spacing,
-        gas_price = gas_price
-    )
-    
-    return(trip_row)
-}
 
 #'
 #' Create the EV fleet for ABM simulation based on SDCM VCDM
@@ -352,7 +413,7 @@ trip_gen <- function(num_days = 1) {
     wa_gas_prices <-
         DBI::dbGetQuery(main_con, 'select * from wa_gas_prices')
     
-    wa_bevs <- DBI::dbGetQuery(main_con, 'select * from wa_bevs')
+    wa_bevs <- DBI::dbGetQuery(main_con, "select * from wa_bevs")
     
     # These are the results of the EV trips generation from PJ
     wa_evtrips <-
@@ -404,7 +465,10 @@ trip_gen <- function(num_days = 1) {
             create_return_df(od = wa_evtrips, all_trips_sp_df = od_sp)
         nz_departure <-
             create_departure_df(od = wa_evtrips, all_trips_sp_df = od_sp)
-        
+        lg$debug(nz_return = nz_return,
+                 msg = paste("nz_return with rows ", nrow(nz_return)))
+        lg$debug(nz_departure =  nz_departure,
+                 msg = paste("nz_departure with rows ", nrow(nz_departure)))
         # Find corresponding EV to make the trip
         return_EVs <- data.frame()
         departure_EVs <- data.frame()
@@ -418,7 +482,10 @@ trip_gen <- function(num_days = 1) {
             nz_return %>% dplyr::group_by(.data$destination) %>% dplyr::summarise(n = base::sum(.data$long_distance_return_trips))
         nz_departure_g <-
             nz_departure %>% dplyr::group_by(.data$origin) %>% dplyr::summarise(n = base::sum(.data$long_distance_departure_trips))
-        
+        lg$trace(nz_return_g = nz_return_g,
+                 msg = paste("nz_return_g with rows ", nrow(nz_return_g)))
+        lg$trace(nz_departure_g = nz_departure_g,
+                 msg = paste("nz_departure with rows ", nrow(nz_departure_g)))
         #print("Finding total trips for a certain source")
         
         # Merge the two dfs to get the total EV requirement per day
@@ -439,21 +506,28 @@ trip_gen <- function(num_days = 1) {
                 returning_trips = .data$n.x,
                 departing_trips = .data$n.y
             )
-        
+        lg$trace(EV_req_tots = EV_req_tots,
+                 msg = paste("EV_req_tots with rows ", nrow(EV_req_tots)))
         # Make random draws from the EVs at the source, for completing these many trips
         # These EVs will then be distributed into departing and returning trips
         i = 1
         for (i in 1:nrow(EV_req_tots)) {
-            
             # Find corresponding EV to make the trip
             return_EVs <- data.frame()
             departure_EVs <- data.frame()
             
             trips_source_i <- EV_req_tots$total_trips[i]
-            print(paste0(i, " trip_source: ", EV_req_tots$source[i]))
+            # print(paste0(i, " trip_source: ", EV_req_tots$source[i]))
+            lg$info(
+                msg = paste0(i, " trip_source: ", EV_req_tots$source[i]),
+                sources =
+                    trips_source_i
+            )
             # Find the EVs in the source zip code that could have made the trip
             source_EVs <-
                 wa_bevs %>% dplyr::filter(.data$zip_code == EV_req_tots$source[i])
+            lg$debug(source_EVs = source_EVs,
+                     msg = paste("source_EVs with rows ", nrow(source_EVs)))
             # If EVs are available in this zip code
             if (nrow(source_EVs) > 0) {
                 trip_EVs <-
@@ -461,6 +535,9 @@ trip_gen <- function(num_days = 1) {
                                                source_EVs = source_EVs)
                 # print("Generated a list of EVs for the days trips - now separate into return and departure")
                 
+                if (dim(trip_EVs)[1] == 0) {
+                    lg$trace(msg = paste("trip_EVs has no rows just schema i = ", i))
+                }
                 # Randomly assign trip start times
                 dst <-
                     lubridate::as_datetime(paste(sim_day, START_TIME), tz = "America/Los_Angeles")
@@ -480,130 +557,183 @@ trip_gen <- function(num_days = 1) {
                         # Find the number of trips between the OD pair
                         trip_count_OD <-
                             nz_return_source$long_distance_return_trips[j]
-                        trip_EVs_returning_OD <-
-                            dplyr::slice(
-                                trip_EVs,
-                                returning_counter:(returning_counter + trip_count_OD - 1)
-                            )
-                        # Increment the counter, so we select new EVs from trip_EVs
-                        returning_counter <-
-                            returning_counter + trip_count_OD
                         
-                        trip_EVs_returning_OD <-
-                            assign_OD_details(
-                                trip_EVs_returning_OD,
-                                origin_zip = nz_return_source$origin[j],
-                                destination_zip = nz_return_source$destination[j]
-                            )
+                        if (nrow(trip_EVs) >= returning_counter + trip_count_OD - 1) {
+                            trip_EVs_returning_OD <-
+                                dplyr::slice(
+                                    trip_EVs,
+                                    returning_counter:(
+                                        returning_counter + trip_count_OD - 1
+                                    )
+                                )
+                            # Increment the counter, so we select new EVs from trip_EVs
+                            returning_counter <-
+                                returning_counter + trip_count_OD
+                            
+                            lg$debug(trip_EVS_returning_OD = trip_EVs_returning_OD,
+                                     msg = "trip_EVs_returning_OD")
+                            
+                            if (dim(trip_EVs_returning_OD)[1] > 0) {
+                                trip_EVs_returning_OD <-
+                                    assign_OD_details(
+                                        trip_EVs_returning_OD,
+                                        origin_zip = nz_return_source$origin[j],
+                                        destination_zip = nz_return_source$destination[j]
+                                    )
+                                
+                                # Randomly assign SOCs to these vehicles, with replacement
+                                trip_EVs_returning_OD$soc <-
+                                    base::sample(
+                                        SOC_LOWER_LIMIT:SOC_UPPER_LIMIT,
+                                        trip_count_OD,
+                                        replace = TRUE
+                                    )
+                                
+                                trip_EVs_returning <-
+                                    rbind(trip_EVs_returning,
+                                          trip_EVs_returning_OD)
+                            }
+                            
+                            
+                        }
+                        # if (dim(trip_EVs_returning_OD)[1] == 0) {
+                        #     lg$trace(
+                        #         msg = paste(
+                        #             "trip_EVs_returing_OD has no rows but schema, j: ",
+                        #             j,
+                        #             " i = ",
+                        #             i
+                        #         )
+                        #     )
+                        #     browser()
+                        # }
                         
-                        # Randomly assign SOCs to these vehicles, with replacement
-                        trip_EVs_returning_OD$soc <-
-                            base::sample(SOC_LOWER_LIMIT:SOC_UPPER_LIMIT,
-                                         trip_count_OD,
-                                         replace = TRUE)
-                        
-                        trip_EVs_returning <-
-                            rbind(trip_EVs_returning,
-                                  trip_EVs_returning_OD)
                     }
                     
-                    # To assign trip start times
-                    # Groupby EV ulid to find if an EV makes more than one trip per day
-                    trip_EVs_returning_g <-
-                        trip_EVs_returning %>% dplyr::group_by(.data$veh_id) %>% dplyr::summarise(n = dplyr::n())
-                    trip_EVs_returning$trip_start_time <- NA
-                    ii <- 1
-                    # These are the unique EVs in the set
-                    for (ii in 1:nrow(trip_EVs_returning_g)) {
-                        returning_trips_per_EV <- trip_EVs_returning_g$n[ii]
-                        jj <- 1
-                        for (jj in 1:returning_trips_per_EV) {
-                            # Make sure the next trip start time generated for the same EV
-                            # allows for the trip to the completed by an average speed
-                            # Assign this trip start time to the corresponding row of the trip_EVs df
-                            EV_id <- trip_EVs_returning_g$veh_id[ii]
-                            # Find the corresponding OD pair, and trip distance
-                            trip_EV_returning_row <-
-                                trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj], ]
-                            origin_zip <-
-                                trip_EV_returning_row$origin_zip
-                            destination_zip <-
-                                trip_EV_returning_row$destination_zip
-                            # Find the row corresponding to the OD pair
-                            trip_sp_ret <-
-                                od_sp %>% dplyr::filter(
-                                    .data$origin == origin_zip,
-                                    .data$destination == destination_zip
+                    if (dim(trip_EVs_returning)[1] > 0) {
+                        # To assign trip start times
+                        # Groupby EV ulid to find if an EV makes more than one trip per day
+                        trip_EVs_returning_g <-
+                            trip_EVs_returning %>% dplyr::group_by(.data$veh_id) %>% dplyr::summarise(n = dplyr::n())
+                        trip_EVs_returning$trip_start_time <- NA
+                        ii <- 1
+                        # These are the unique EVs in the set
+                        for (ii in 1:nrow(trip_EVs_returning_g)) {
+                            returning_trips_per_EV <- trip_EVs_returning_g$n[ii]
+                            jj <- 1
+                            for (jj in 1:returning_trips_per_EV) {
+                                # Make sure the next trip start time generated for the same EV
+                                # allows for the trip to the completed by an average speed
+                                # Assign this trip start time to the corresponding row of the trip_EVs df
+                                EV_id <-
+                                    trip_EVs_returning_g$veh_id[ii]
+                                # Find the corresponding OD pair, and trip distance
+                                trip_EV_returning_row <-
+                                    trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj], ]
+                                print(paste("jj", jj, 'i', i, 'j', j, 'ii: ', ii ))
+                                
+                                # lg$info(paste("jj", jj, 'i', i, 'j', j))
+                                lg$debug(
+                                    trip_EV_returning_row = trip_EV_returning_row,
+                                    msg = paste("jj", jj, 'i', i, 'j', j)
                                 )
-                            trip_cd_ret <-
-                                od_cd %>% dplyr::filter(
-                                    .data$origin == origin_zip,
-                                    .data$destination == destination_zip
-                                )
-                            trip_dc_ret <- dest_charger %>% dplyr::filter(.data$zip == destination_zip)
-                            # Find the distance for the OD pair
-                            dist <-
-                                trip_sp_ret$shortest_path_length
-                            
-                            # Find the possible trip time rounded to hours and subtract from `det`
-                            # This means that a trip can start anywhere where trip start time and end
-                            # time such that it reaches the destination by around 10.00pm.
-                            trip_time <-
-                                lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
-                            det_updated <- det - trip_time
-                            # If the trip is too long, then we might have to leave before 6.00am
-                            if (det_updated <= dst) {
-                                dst <- det_updated
+                                
+                                if (dim(trip_EV_returning_row)[1] == 0) {
+                                    browser()
+                                    lg$trace(
+                                        msg = paste(
+                                            "trip_EV_returning_row has no rows just schema, jj: ",
+                                            jj,
+                                            " j: ",
+                                            j,
+                                            " i = ",
+                                            i,
+                                            "ii: ",
+                                            ii
+                                        )
+                                    )
+                                }
+                                origin_zip <-
+                                    trip_EV_returning_row$origin_zip
+                                destination_zip <-
+                                    trip_EV_returning_row$destination_zip
+                                # Find the row corresponding to the OD pair
+                                trip_sp_ret <-
+                                    od_sp %>% dplyr::filter(
+                                        .data$origin == origin_zip,
+                                        .data$destination == destination_zip
+                                    )
+                                trip_cd_ret <-
+                                    od_cd %>% dplyr::filter(
+                                        .data$origin == origin_zip,
+                                        .data$destination == destination_zip
+                                    )
+                                trip_dc_ret <-
+                                    dest_charger %>% dplyr::filter(.data$zip == destination_zip)
+                                # Find the distance for the OD pair
+                                dist <-
+                                    trip_sp_ret$shortest_path_length
+                                
+                                # Find the possible trip time rounded to hours and subtract from `det`
+                                # This means that a trip can start anywhere where trip start time and end
+                                # time such that it reaches the destination by around 10.00pm.
+                                trip_time <-
+                                    lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
+                                det_updated <- det - trip_time
+                                # If the trip is too long, then we might have to leave before 6.00am
+                                if (det_updated <= dst) {
+                                    dst <- det_updated
+                                }
+                                trip_start_time <-
+                                    rnd_date_time(
+                                        1,
+                                        st = dst,
+                                        et = det_updated,
+                                        tz = "America/Los_Angeles"
+                                    )
+                                # print(as.character(trip_start_time))
+                                
+                                trip_EV_returning_row$trip_start_time <-
+                                    as.character(trip_start_time)
+                                
+                                trip_EV_returning_row$dist <- dist
+                                
+                                # Find a start time that includes this trip time
+                                dst <-
+                                    trip_start_time + lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
+                                
+                                returning_trip_row <-
+                                    make_trip_row(
+                                        gas_prices = wa_gas_prices,
+                                        trip_EV_row = trip_EV_returning_row,
+                                        trip_sp = trip_sp_ret,
+                                        trip_cd = trip_cd_ret,
+                                        trip_dc = trip_dc_ret
+                                    )
+                                
+                                prob_ij_bev <-
+                                    vcdm_scdm4(
+                                        ev_range = trip_EV_returning_row$electric_range,
+                                        trip_row = returning_trip_row
+                                    )
+                                # print(prob_ij)
+                                # Make a random draw based on this probability
+                                ret_vehicle_choice <-
+                                    stats::rbinom(1, 1, prob_ij_bev)
+                                
+                                if (ret_vehicle_choice == 1) {
+                                    # Add the rows for an OD pair to the total dataframe
+                                    return_EVs <-
+                                        rbind(return_EVs,
+                                              trip_EV_returning_row)
+                                }
                             }
-                            trip_start_time <-
-                                rnd_date_time(
-                                    1,
-                                    st = dst,
-                                    et = det_updated,
-                                    tz = "America/Los_Angeles"
-                                )
-                            # print(as.character(trip_start_time))
                             
-                            trip_EV_returning_row$trip_start_time <-
-                                as.character(trip_start_time)
-                            
-                            trip_EV_returning_row$dist <- dist
-                            
-                            # Find a start time that includes this trip time
-                            dst <-
-                                trip_start_time + lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
-                            
-                            returning_trip_row <-
-                                make_trip_row(
-                                    gas_prices = wa_gas_prices,
-                                    trip_EV_row = trip_EV_returning_row,
-                                    trip_sp = trip_sp_ret, 
-                                    trip_cd = trip_cd_ret, 
-                                    trip_dc = trip_dc_ret
-                                )
-                            
-                            prob_ij_bev <-
-                                vcdm_scdm4(
-                                    ev_range = trip_EV_returning_row$electric_range,
-                                    trip_row = returning_trip_row
-                                )
-                            # print(prob_ij)
-                            # Make a random draw based on this probability
-                            ret_vehicle_choice <-
-                                stats::rbinom(1, 1, prob_ij_bev)
-                            
-                            if (ret_vehicle_choice == 1) {
-                                # Add the rows for an OD pair to the total dataframe
-                                return_EVs <-
-                                    rbind(return_EVs,
-                                          trip_EV_returning_row)
-                            }
+                            # Reset the trip start time limit
+                            dst <- paste(sim_day, START_TIME)
                         }
                         
-                        # Reset the trip start time limit
-                        dst <- paste(sim_day, START_TIME)
                     }
-                    
                 }
                 
                 # Reset the trip start and end times
@@ -629,132 +759,166 @@ trip_gen <- function(num_days = 1) {
                             nz_departure_source$long_distance_departure_trips[j]
                         # print("returning_counter")
                         # print(returning_counter)
-                        trip_EVs_departing_OD <-
-                            dplyr::slice(
-                                trip_EVs,
-                                (
-                                    returning_counter + departing_counter
-                                ):(
-                                    returning_counter + departing_counter + trip_count_OD - 1
+                        if (nrow(trip_EVs) >= returning_counter + departing_counter + trip_count_OD - 1) {
+                            trip_EVs_departing_OD <-
+                                dplyr::slice(
+                                    trip_EVs,
+                                    (
+                                        returning_counter + departing_counter
+                                    ):(
+                                        returning_counter + departing_counter + trip_count_OD - 1
+                                    )
                                 )
-                            )
-                        # Increment the counter, so we select new EVs from trip_EVs
-                        departing_counter <-
-                            departing_counter + trip_count_OD
-                        
-                        trip_EVs_departing_OD <-
-                            assign_OD_details(
-                                trip_EVs_OD = trip_EVs_departing_OD,
-                                origin_zip = nz_departure_source$origin[j],
-                                destination_zip = nz_departure_source$destination[j]
-                            )
-                        # Randomly assign SOCs to these vehicles, with replacement
-                        trip_EVs_departing_OD$soc <-
-                            base::sample(SOC_LOWER_LIMIT:SOC_UPPER_LIMIT,
-                                         trip_count_OD,
-                                         replace = TRUE)
-                        
-                        trip_EVs_departing <-
-                            rbind(trip_EVs_departing,
-                                  trip_EVs_departing_OD)
-                    }
-                    
-                    # To assign trip start times
-                    # Groupby EV ulid to find if an EV makes more than one trip per day
-                    trip_EVs_departing_g <-
-                        trip_EVs_departing %>% dplyr::group_by(.data$veh_id) %>% dplyr::summarise(n = dplyr::n())
-                    
-                    trip_EVs_departing$trip_start_time <- NA
-                    # These are the unique EVs in the set
-                    for (ii in 1:nrow(trip_EVs_departing_g)) {
-                        departing_trips_per_EV <- trip_EVs_departing_g$n[ii]
-                        
-                        for (jj in 1:departing_trips_per_EV) {
-                            # print(as.character(trip_start_time))
-                            # Assign this trip start time to the corresponding row of the trip_EVs df
-                            EV_id <- trip_EVs_departing_g$veh_id[ii]
+                            # Increment the counter, so we select new EVs from trip_EVs
+                            departing_counter <-
+                                departing_counter + trip_count_OD
                             
-                            # Make sure the next trip start time generated for the same EV
-                            # allows for the trip to the completed by an average speed
-                            
-                            # Find the corresponding OD pair, and trip distance
-                            trip_EV_departing_row <-
-                                trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj], ]
-                            origin_zip <-
-                                trip_EV_departing_row$origin_zip
-                            destination_zip <-
-                                trip_EV_departing_row$destination_zip
-                            # Find the row corresponding to the OD pair
-                            trip_sp_dep <-
-                                od_sp %>% dplyr::filter(
-                                    .data$origin == origin_zip,
-                                    .data$destination == destination_zip
-                                )
-                            trip_cd_dep <-
-                                od_cd %>% dplyr::filter(
-                                    .data$origin == origin_zip,
-                                    .data$destination == destination_zip
-                                )
-                            trip_dc_dep <- dest_charger %>% dplyr::filter(.data$zip == destination_zip)
-                            # Find the distance for the OD pair
-                            dist <- trip_sp_dep$shortest_path_length
-                            # Find a start time that includes this trip time
-                            
-                            trip_time <-
-                                lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
-                            
-                            det_updated <- det - trip_time
-                            # If the trip is too long, then we might have to leave before 6.00am
-                            if (det_updated <= dst) {
-                                dst <- det_updated
+                            if (dim(trip_EVs_departing_OD)[1] > 0) {
+                                trip_EVs_departing_OD <-
+                                    assign_OD_details(
+                                        trip_EVs_OD = trip_EVs_departing_OD,
+                                        origin_zip = nz_departure_source$origin[j],
+                                        destination_zip = nz_departure_source$destination[j]
+                                    )
+                                # Randomly assign SOCs to these vehicles, with replacement
+                                trip_EVs_departing_OD$soc <-
+                                    base::sample(
+                                        SOC_LOWER_LIMIT:SOC_UPPER_LIMIT,
+                                        trip_count_OD,
+                                        replace = TRUE
+                                    )
+                                
+                                trip_EVs_departing <-
+                                    rbind(trip_EVs_departing,
+                                          trip_EVs_departing_OD)
                             }
-                            trip_start_time <-
-                                rnd_date_time(
-                                    1,
-                                    st = dst,
-                                    et = det_updated,
-                                    tz = "America/Los_Angeles"
-                                )
-                            trip_EV_departing_row$trip_start_time <-
-                                as.character(trip_start_time)
-                            
-                            trip_EV_departing_row$dist <- dist
-                            
-                            dst <-
-                                trip_start_time + lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
-                            
-                            departing_trip_row <-
-                                make_trip_row(
-                                    gas_prices = wa_gas_prices,
-                                    trip_EV_row = trip_EV_departing_row,
-                                    trip_sp = trip_sp_dep, 
-                                    trip_cd = trip_cd_dep, 
-                                    trip_dc = trip_dc_dep
-                                )
-                            
-                            prob_ij_bev <-
-                                vcdm_scdm4(
-                                    ev_range = trip_EV_departing_row$electric_range,
-                                    trip_row = departing_trip_row
-                                )
-                            
-                            # print(prob_ij)
-                            dep_vehicle_choice <-
-                                stats::rbinom(1, 1, prob_ij_bev)
-                            
-                            if (dep_vehicle_choice == 1) {
-                                # Add the rows for an OD pair to the total dataframe
-                                # Binomial draw for one trial
-                                departure_EVs <-
-                                    rbind(departure_EVs,
-                                          trip_EV_departing_row)
-                            }
-                            
-                            
                         }
                         
-                        # Reset the trip start time limit
-                        dst <- paste(sim_day, START_TIME)
+                        
+                        # if (dim(trip_EVs_departing_OD)[1] == 0) {
+                        #     lg$fatal(msg = "trip_EVs_departing_OD has no rows just schema")
+                        #     browser()
+                        # }
+                        
+                    }
+                    
+                    if (dim(trip_EVs_departing)[1] > 0) {
+                        # To assign trip start times
+                        # Groupby EV ulid to find if an EV makes more than one trip per day
+                        trip_EVs_departing_g <-
+                            trip_EVs_departing %>% dplyr::group_by(.data$veh_id) %>% dplyr::summarise(n = dplyr::n())
+                        
+                        trip_EVs_departing$trip_start_time <- NA
+                        # These are the unique EVs in the set
+                        for (ii in 1:nrow(trip_EVs_departing_g)) {
+                            departing_trips_per_EV <- trip_EVs_departing_g$n[ii]
+                            
+                            for (jj in 1:departing_trips_per_EV) {
+                                # print(as.character(trip_start_time))
+                                # Assign this trip start time to the corresponding row of the trip_EVs df
+                                EV_id <-
+                                    trip_EVs_departing_g$veh_id[ii]
+                                
+                                # Make sure the next trip start time generated for the same EV
+                                # allows for the trip to the completed by an average speed
+                                
+                                # Find the corresponding OD pair, and trip distance
+                                trip_EV_departing_row <-
+                                    trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj], ]
+                                
+                                if (dim(trip_EV_departing_row)[1] == 0) {
+                                    browser()
+                                    lg$trace(
+                                        msg = paste(
+                                            "trip_EV_departing_row has no rows just schema, jj: ",
+                                            jj,
+                                            " j: ",
+                                            j,
+                                            " i = ",
+                                            i,
+                                            "ii: ",
+                                            ii
+                                        )
+                                    )
+                                }
+                                origin_zip <-
+                                    trip_EV_departing_row$origin_zip
+                                destination_zip <-
+                                    trip_EV_departing_row$destination_zip
+                                # Find the row corresponding to the OD pair
+                                trip_sp_dep <-
+                                    od_sp %>% dplyr::filter(
+                                        .data$origin == origin_zip,
+                                        .data$destination == destination_zip
+                                    )
+                                trip_cd_dep <-
+                                    od_cd %>% dplyr::filter(
+                                        .data$origin == origin_zip,
+                                        .data$destination == destination_zip
+                                    )
+                                trip_dc_dep <-
+                                    dest_charger %>% dplyr::filter(.data$zip == destination_zip)
+                                # Find the distance for the OD pair
+                                dist <-
+                                    trip_sp_dep$shortest_path_length
+                                # Find a start time that includes this trip time
+                                
+                                trip_time <-
+                                    lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
+                                
+                                det_updated <- det - trip_time
+                                # If the trip is too long, then we might have to leave before 6.00am
+                                if (det_updated <= dst) {
+                                    dst <- det_updated
+                                }
+                                trip_start_time <-
+                                    rnd_date_time(
+                                        1,
+                                        st = dst,
+                                        et = det_updated,
+                                        tz = "America/Los_Angeles"
+                                    )
+                                trip_EV_departing_row$trip_start_time <-
+                                    as.character(trip_start_time)
+                                
+                                trip_EV_departing_row$dist <- dist
+                                
+                                dst <-
+                                    trip_start_time + lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
+                                
+                                departing_trip_row <-
+                                    make_trip_row(
+                                        gas_prices = wa_gas_prices,
+                                        trip_EV_row = trip_EV_departing_row,
+                                        trip_sp = trip_sp_dep,
+                                        trip_cd = trip_cd_dep,
+                                        trip_dc = trip_dc_dep
+                                    )
+                                
+                                prob_ij_bev <-
+                                    vcdm_scdm4(
+                                        ev_range = trip_EV_departing_row$electric_range,
+                                        trip_row = departing_trip_row
+                                    )
+                                
+                                # print(prob_ij)
+                                dep_vehicle_choice <-
+                                    stats::rbinom(1, 1, prob_ij_bev)
+                                
+                                if (dep_vehicle_choice == 1) {
+                                    # Add the rows for an OD pair to the total dataframe
+                                    # Binomial draw for one trial
+                                    departure_EVs <-
+                                        rbind(departure_EVs,
+                                              trip_EV_departing_row)
+                                }
+                                
+                                
+                            }
+                            
+                            # Reset the trip start time limit
+                            dst <- paste(sim_day, START_TIME)
+                        }
                     }
                 }
                 
@@ -769,10 +933,20 @@ trip_gen <- function(num_days = 1) {
             day_EVs <- data.frame()
             day_EVs <- rbind(return_EVs, departure_EVs)
             
-            print(day_EVs)
-            evtrips_zip <- day_EVs %>% dplyr::select(veh_id, origin_zip, destination_zip, soc, trip_start_time) %>% dplyr::mutate(analysis_id = a_id, simulated_date = sim_day)
+            # print(day_EVs)
+            lg$info(day_EVs = day_EVs, msg = "day_EVs")
+            if (dim(day_EVs)[1] > 0) {
+                evtrips_zip <-
+                    day_EVs %>% dplyr::select(veh_id,
+                                              origin_zip,
+                                              destination_zip,
+                                              soc,
+                                              trip_start_time) %>% dplyr::mutate(analysis_id = a_id,
+                                                                                 simulated_date = sim_day)
+                
+                DBI::dbAppendTable(main_con, 'evtrip_scenarios', evtrips_zip)
+            }
             
-            DBI::dbAppendTable(main_con, 'evtrip_scenarios', evtrips_zip)
             # utils::write.csv(
             #     day_EVs,
             #     file = here::here("trip_scenarios",

@@ -40,3 +40,4 @@ rsconnect/
 inputs/
 gama/
 _auth0.yml
+.Rproj.user
