@@ -170,4 +170,50 @@ testthat::test_that("make_trip_row gives the correct error on wrong inputs", {
     trip_cd = test_trip_cd1,
     trip_dc = test_trip_dc2
   ), 'trip_dc should be of type data.frame')
+
+  test_trip_EV_row3 <-
+    data.frame(origin_zip = 98001)
+
+  test_trip_EV_row4 <-
+    data.frame(connector_code = "abc", origin_zip = 98001)
+
+  test_trip_EV_row5 <-
+    data.frame(connector_code = 1)
+
+  test_trip_EV_row6 <-
+    data.frame(connector_code = 1, origin_zip = "abc")
+
+  testthat::expect_error(make_trip_row(
+    gas_prices = test_gas_prices1,
+    trip_EV_row = test_trip_EV_row3,
+    trip_sp = test_trip_sp1,
+    trip_cd = test_trip_cd1,
+    trip_dc = test_trip_dc1
+  ), 'trip_EV_row should have a column connector_code')
+
+  testthat::expect_error(make_trip_row(
+    gas_prices = test_gas_prices1,
+    trip_EV_row = test_trip_EV_row4,
+    trip_sp = test_trip_sp1,
+    trip_cd = test_trip_cd1,
+    trip_dc = test_trip_dc1
+  ), 'column connector_code in trip_EV_row should be of type integer')
+
+  testthat::expect_error(make_trip_row(
+    gas_prices = test_gas_prices1,
+    trip_EV_row = test_trip_EV_row5,
+    trip_sp = test_trip_sp1,
+    trip_cd = test_trip_cd1,
+    trip_dc = test_trip_dc1
+  ), 'trip_EV_row should have a column origin_zip')
+
+  testthat::expect_error(make_trip_row(
+    gas_prices = test_gas_prices1,
+    trip_EV_row = test_trip_EV_row6,
+    trip_sp = test_trip_sp1,
+    trip_cd = test_trip_cd1,
+    trip_dc = test_trip_dc1
+  ), 'column origin_zip in trip_EV_row should be of type integer')
+
+
 })

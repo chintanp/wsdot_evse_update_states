@@ -295,13 +295,13 @@ create_departure_df <- function(od, od_sp, config) {
 #'@return The selected trip EVs from the set of EVs at source
 #'
 get_tripEVs_from_sourceEVs <- function(trips_source_i, source_EVs) {
-  if(!class(source_EVs) == 'data.frame') {
+  if (!class(source_EVs) == 'data.frame') {
     stop('source_EVs should be of type data.frame')
   }
-  if(!(class(trips_source_i) == 'numeric' || class(trips_source_i) == 'integer')) {
+  if (!(class(trips_source_i) == 'numeric' || class(trips_source_i) == 'integer')) {
     stop('trips_source_i should be an integer or numeric value')
   }
-  if(trips_source_i < 0) {
+  if (trips_source_i < 0) {
     stop('trips_source_i should be a positive integer')
   }
 
@@ -332,13 +332,13 @@ get_tripEVs_from_sourceEVs <- function(trips_source_i, source_EVs) {
 #'
 get_Gas_Price <- function(gas_prices, origin_zip) {
 
-  if(!class(gas_prices) == 'data.frame') {
+  if (!class(gas_prices) == 'data.frame') {
     stop('gas_prices should be of type data.frame')
   }
-  if(!(class(origin_zip) == 'numeric' || class(origin_zip) == 'integer')) {
+  if (!(class(origin_zip) == 'numeric' || class(origin_zip) == 'integer')) {
     stop('origin_zip should be an integer or numeric value')
   }
-  if(origin_zip < 0) {
+  if (origin_zip < 0) {
     stop('origin_zip should be a positive integer')
   }
 
@@ -371,21 +371,38 @@ make_trip_row <-
            trip_cd,
            trip_dc) {
 
-    if(!class(gas_prices) == 'data.frame') {
+
+# Input validation --------------------------------------------------------
+
+    if (!class(gas_prices) == 'data.frame') {
       stop('gas_prices should be of type data.frame')
     }
-    if(!class(trip_EV_row) == 'data.frame') {
+    if (!class(trip_EV_row) == 'data.frame') {
       stop('trip_EV_row should be of type data.frame')
     }
-    if(!class(trip_sp) == 'data.frame') {
+    if (!class(trip_sp) == 'data.frame') {
       stop('trip_sp should be of type data.frame')
     }
-    if(!class(trip_cd) == 'data.frame') {
+    if (!class(trip_cd) == 'data.frame') {
       stop('trip_cd should be of type data.frame')
     }
-    if(!class(trip_dc) == 'data.frame') {
+    if (!class(trip_dc) == 'data.frame') {
       stop('trip_dc should be of type data.frame')
     }
+    if (!('connector_code' %in% colnames(trip_EV_row))) {
+      stop('trip_EV_row should have a column connector_code')
+    }
+    if (!(class(trip_EV_row$connector_code) == 'integer' || class(trip_EV_row$connector_code) == 'numeric')) {
+      stop('column connector_code in trip_EV_row should be of type integer')
+    }
+    if (!('origin_zip' %in% colnames(trip_EV_row))) {
+      stop('trip_EV_row should have a column origin_zip')
+    }
+    if (!(class(trip_EV_row$origin_zip) == 'integer' || class(trip_EV_row$origin_zip) == 'numeric')) {
+      stop('column origin_zip in trip_EV_row should be of type integer')
+    }
+
+# Input correction --------------------------------------------------------
 
     # trip_cd is null, then give it path length
     if (rapportools::is.empty(trip_cd$cd_chademo)) {
@@ -406,6 +423,8 @@ make_trip_row <-
       trip_cd[1, 'cd_combo'] <-
         trip_sp$shortest_path_length[1]
     }
+
+# Assignment --------------------------------------------------------------
 
     if (trip_EV_row$connector_code == 1) {
       max_spacing <- trip_cd$cd_chademo # in miles
@@ -492,7 +511,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
   wa_gas_prices <-
     DBI::dbGetQuery(main_con, 'select * from wa_gas_prices')
 
-  wa_bevs <- DBI::dbGetQuery(main_con, "select * from wa_bevs")
+  wa_bevs <- DBI::dbGetQuery(main_con, "select veh_id, electric_range, zip_code, connector_code from wa_bevs")
 
   # These are the results of the EV trips generation from PJ
   wa_evtrips <-
@@ -696,7 +715,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_returning_row <-
                   trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj],]
-                print(paste("jj", jj, 'i', i, 'j', j))
+                # print(paste("jj", jj, 'i', i, 'j', j))
 
                 # lg$info(paste("jj", jj, 'i', i, 'j', j))
                 # lg$debug(
@@ -976,7 +995,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
       day_EVs <- data.frame()
       day_EVs <- rbind(return_EVs, departure_EVs)
 
-      print(day_EVs)
+      # print(day_EVs)
       # lg$info(day_EVs = day_EVs, msg = "day_EVs")
       if (dim(day_EVs)[1] > 0) {
         evtrips_zip <-
