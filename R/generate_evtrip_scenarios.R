@@ -66,7 +66,7 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
   if (is.null(config[['AVG_RENTAL_CAR_COST']])) {
     stop('config is missing the field `AVG_RENTAL_CAR_COST`')
   }
-  if (class(ev_range) != 'numeric') {
+  if (!(class(ev_range) == 'numeric' || class(ev_range) == 'integer') ) {
     stop('ev_range is of non-numeric type - provide numeric value for ev_range')
   }
   if (ev_range <= 0) {
@@ -155,7 +155,7 @@ create_return_df <- function(od, od_sp, config) {
   if (is.null(config[['CRITICAL_DISTANCE']])) {
     stop('config is missing the field `CRITICAL_DISTANCE`')
   }
-  if (class(config[['CRITICAL_DISTANCE']]) != 'numeric') {
+  if (! (class(config[['CRITICAL_DISTANCE']]) == 'numeric' || class(config[['CRITICAL_DISTANCE']]) == 'integer') ) {
     stop('`CRITICAL_DISTANCE` should be of class numeric')
   }
   if (config[['CRITICAL_DISTANCE']] < 0) {
@@ -247,7 +247,7 @@ create_departure_df <- function(od, od_sp, config) {
   if (is.null(config[['CRITICAL_DISTANCE']])) {
     stop('config is missing the field `CRITICAL_DISTANCE`')
   }
-  if (class(config[['CRITICAL_DISTANCE']]) != 'numeric') {
+  if (!(class(config[['CRITICAL_DISTANCE']]) == 'numeric' || class(config[['CRITICAL_DISTANCE']]) == 'integer') ) {
     stop('`CRITICAL_DISTANCE` should be of class numeric')
   }
   if (config[['CRITICAL_DISTANCE']] < 0) {
@@ -295,6 +295,16 @@ create_departure_df <- function(od, od_sp, config) {
 #'@return The selected trip EVs from the set of EVs at source
 #'
 get_tripEVs_from_sourceEVs <- function(trips_source_i, source_EVs) {
+  if(!class(source_EVs) == 'data.frame') {
+    stop('source_EVs should be of type data.frame')
+  }
+  if(!(class(trips_source_i) == 'numeric' || class(trips_source_i) == 'integer')) {
+    stop('trips_source_i should be an integer or numeric value')
+  }
+  if(trips_source_i < 0) {
+    stop('trips_source_i should be a positive integer')
+  }
+
   # An EV cannot make two trips in a day
   if (trips_source_i > nrow(source_EVs)) {
     trips_source_i <- nrow(source_EVs)
@@ -321,6 +331,17 @@ get_tripEVs_from_sourceEVs <- function(trips_source_i, source_EVs) {
 #' @return The gas price for the relevant zip code
 #'
 get_Gas_Price <- function(gas_prices, origin_zip) {
+
+  if(!class(gas_prices) == 'data.frame') {
+    stop('gas_prices should be of type data.frame')
+  }
+  if(!(class(origin_zip) == 'numeric' || class(origin_zip) == 'integer')) {
+    stop('origin_zip should be an integer or numeric value')
+  }
+  if(origin_zip < 0) {
+    stop('origin_zip should be a positive integer')
+  }
+
   gas_price <-
     gas_prices$avg_gas_price[gas_prices$zip == origin_zip]
 
@@ -349,13 +370,23 @@ make_trip_row <-
            trip_sp,
            trip_cd,
            trip_dc) {
-    # lg$debug(
-    #     trip_EV_row = trip_EV_row,
-    #     trip_sp = trip_sp,
-    #     trip_cd = trip_cd,
-    #     trip_dc = trip_dc,
-    #     msg = "in make_trip_row"
-    # )
+
+    if(!class(gas_prices) == 'data.frame') {
+      stop('gas_prices should be of type data.frame')
+    }
+    if(!class(trip_EV_row) == 'data.frame') {
+      stop('trip_EV_row should be of type data.frame')
+    }
+    if(!class(trip_sp) == 'data.frame') {
+      stop('trip_sp should be of type data.frame')
+    }
+    if(!class(trip_cd) == 'data.frame') {
+      stop('trip_cd should be of type data.frame')
+    }
+    if(!class(trip_dc) == 'data.frame') {
+      stop('trip_dc should be of type data.frame')
+    }
+
     # trip_cd is null, then give it path length
     if (rapportools::is.empty(trip_cd$cd_chademo)) {
       # lg$fatal(msg = paste("cd_chademo is null"),
@@ -911,7 +942,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
 
                 prob_ij_bev <-
                   vcdm_scdm4(ev_range = trip_EV_departing_row$electric_range,
-                             trip_row = departing_trip_row)
+                             trip_row = departing_trip_row, config = config)
 
                 # print(prob_ij)
                 dep_vehicle_choice <-
