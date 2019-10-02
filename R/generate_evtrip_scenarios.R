@@ -47,6 +47,31 @@ rnd_date_time <-
 #' @return The probability of travel by EV
 
 vcdm_scdm4 <- function(ev_range, trip_row, config) {
+
+  if (nrow(trip_row) == 0) {
+    stop('trip_row has 0 rows - should have just 1')
+  }
+  else if (nrow(trip_row) > 1) {
+    stop('trip_row has more than 1 rows - should have just 1')
+  }
+  if (is.null(config[['AVG_FUEL_ECONOMY_OWN']])) {
+    stop('config is missing the field `AVG_FUEL_ECONOMY_OWN`')
+  }
+  if (is.null(config[['AVG_FUEL_ECONOMY_RENTAL']])) {
+    stop('config is missing the field `AVG_FUEL_ECONOMY_RENTAL`')
+  }
+  if (is.null(config[['AVG_RESTROOM_SPACING']])) {
+    stop('config is missing the field `AVG_RESTROOM_SPACING`')
+  }
+  if (is.null(config[['AVG_RENTAL_CAR_COST']])) {
+    stop('config is missing the field `AVG_RENTAL_CAR_COST`')
+  }
+  if (class(ev_range) != 'numeric') {
+    stop('ev_range is of non-numeric type - provide numeric value for ev_range')
+  }
+  if (ev_range <= 0) {
+    stop('ev_range should be a positive value')
+  }
   # Vehicle choice decision model parameters
   theta_1 <- -0.04
   theta_2 <- 0.059
@@ -60,7 +85,7 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
   ASC_BEV <- 11.184
 
   # Get the constants from the config file
-  config <- config::get()
+  # config <- config::get()
 
   util_ij_ice <-
     theta_1 * trip_row$gas_price * trip_row$dist / config$AVG_FUEL_ECONOMY_OWN
@@ -82,6 +107,7 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
   prob_ij_bev <-
     exp(util_ij_bev) / (exp(util_ij_bev) + exp(util_ij_rent) + exp(util_ij_ice))
 
+  # print(prob_ij_bev)
   return(prob_ij_bev)
 }
 
@@ -95,10 +121,47 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
 #' number of trips between the origin and destination
 #'
 #' @import magrittr
+#' @importFrom rlang .data
 #'
 create_return_df <- function(od, od_sp, config) {
-  # Get the constants from the config file
-  config <- config::get()
+
+  if (dim(od)[1] == 0) {
+    stop('od has 0 rows - should have atleast 1')
+  }
+  if (!('origin' %in% colnames(od))) {
+    stop('od is missing the necessary column origin')
+  }
+  if (!('destination' %in% colnames(od))) {
+    stop('od is missing the necessary column destination')
+  }
+  if (!('ret_calib_daily' %in% colnames(od))) {
+    stop('od is missing the necessary column ret_calib_daily')
+  }
+  if (!('devs' %in% colnames(od))) {
+    stop('od is missing the necessary column devs')
+  }
+  if (!('dcars' %in% colnames(od))) {
+    stop('od is missing the necessary column dcars')
+  }
+  if (!('origin' %in% colnames(od_sp))) {
+    stop('od_sp is missing the necessary column origin')
+  }
+  if (!('destination' %in% colnames(od_sp))) {
+    stop('od_sp is missing the necessary column destination')
+  }
+  if (!('shortest_path_length' %in% colnames(od_sp))) {
+    stop('od_sp is missing the necessary column shortest_path_length')
+  }
+  if (is.null(config[['CRITICAL_DISTANCE']])) {
+    stop('config is missing the field `CRITICAL_DISTANCE`')
+  }
+  if (class(config[['CRITICAL_DISTANCE']]) != 'numeric') {
+    stop('`CRITICAL_DISTANCE` should be of class numeric')
+  }
+  if (config[['CRITICAL_DISTANCE']] < 0) {
+    stop('`CRITICAL_DISTANCE` should be a positive number')
+  }
+
   #random draw from Poisson distribution
   daily_counts_ret <-
     stats::rpois(dim(od)[1], od$ret_calib_daily)
@@ -128,12 +191,13 @@ create_return_df <- function(od, od_sp, config) {
 
   # Filter out OD pairs that are less than 70 miles apart
   return_distances_CD <-
-    return_distances %>% dplyr::filter("shortest_path_length" >= config$CRITICAL_DISTANCE)
+    return_distances %>% dplyr::filter(.data$shortest_path_length >= config$CRITICAL_DISTANCE)
 
   # Filter out OD pairs with non-zero trips
   nz_return <-
-    return_distances_CD %>% dplyr::filter("long_distance_return_trips" > 0)
+    return_distances_CD %>% dplyr::filter(.data$long_distance_return_trips > 0)
 
+  # print(nz_return)
   return(nz_return)
 }
 
@@ -147,11 +211,48 @@ create_return_df <- function(od, od_sp, config) {
 #' number of trips between the origin and destination
 #'
 #' @import magrittr
+#' @importFrom rlang .data
 #'
 create_departure_df <- function(od, od_sp, config) {
 
   # Get the constants from the config file
-  config <- config::get()
+  # config <- config::get()
+  if (dim(od)[1] == 0) {
+    stop('od has 0 rows - should have atleast 1')
+  }
+  if (!('origin' %in% colnames(od))) {
+    stop('od is missing the necessary column origin')
+  }
+  if (!('destination' %in% colnames(od))) {
+    stop('od is missing the necessary column destination')
+  }
+  if (!('dep_calib_daily' %in% colnames(od))) {
+    stop('od is missing the necessary column dep_calib_daily')
+  }
+  if (!('oevs' %in% colnames(od))) {
+    stop('od is missing the necessary column oevs')
+  }
+  if (!('ocars' %in% colnames(od))) {
+    stop('od is missing the necessary column ocars')
+  }
+  if (!('origin' %in% colnames(od_sp))) {
+    stop('od_sp is missing the necessary column origin')
+  }
+  if (!('destination' %in% colnames(od_sp))) {
+    stop('od_sp is missing the necessary column destination')
+  }
+  if (!('shortest_path_length' %in% colnames(od_sp))) {
+    stop('od_sp is missing the necessary column shortest_path_length')
+  }
+  if (is.null(config[['CRITICAL_DISTANCE']])) {
+    stop('config is missing the field `CRITICAL_DISTANCE`')
+  }
+  if (class(config[['CRITICAL_DISTANCE']]) != 'numeric') {
+    stop('`CRITICAL_DISTANCE` should be of class numeric')
+  }
+  if (config[['CRITICAL_DISTANCE']] < 0) {
+    stop('`CRITICAL_DISTANCE` should be a positive number')
+  }
 
   daily_counts_dep <-
     stats::rpois(dim(od)[1], od$dep_calib_daily)   #random draw from Poisson distribution
@@ -178,11 +279,11 @@ create_departure_df <- function(od, od_sp, config) {
       by.y = c('origin', 'destination')
     )
   departure_distances_CD <-
-    departure_distances %>% dplyr::filter("shortest_path_length" >= config$CRITICAL_DISTANCE)
+    departure_distances %>% dplyr::filter(.data$shortest_path_length >= config$CRITICAL_DISTANCE)
 
   nz_departure <-
-    departure_distances_CD %>% dplyr::filter("long_distance_departure_trips" > 0)
-
+    departure_distances_CD %>% dplyr::filter(.data$long_distance_departure_trips > 0)
+  # print(nz_departure)
   return(nz_departure)
 }
 
@@ -331,6 +432,7 @@ make_trip_row <-
 #'
 #' @param num_days Number of days to generate the EV fleet for.
 #' @param config constants
+#' @param a_id analysis_id
 #'
 #' @return Day EVs
 #'
@@ -341,9 +443,9 @@ make_trip_row <-
 #' @importFrom utils data
 #' @importFrom rlang .data
 #'
-trip_gen <- function(num_days = 1, config, analysis_id = 15) {
+trip_gen <- function(num_days = 1, config, a_id = 15) {
   # Get the constants from the config file
-  config <- config::get()
+  #  config <- config::get()
 
   # Database settings -------------------------------------------------------
 
@@ -408,9 +510,9 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
     #print(" Finding the returning and departing EV trips for the day ")
 
     nz_return <-
-      create_return_df(od = wa_evtrips, od_sp = od_sp)
+      create_return_df(od = wa_evtrips, od_sp = od_sp, config = config)
     nz_departure <-
-      create_departure_df(od = wa_evtrips, od_sp = od_sp)
+      create_departure_df(od = wa_evtrips, od_sp = od_sp, config = config)
     # lg$debug(nz_return = nz_return,
     #          msg = paste("nz_return with rows ", nrow(nz_return)))
     # lg$debug(nz_departure =  nz_departure,
@@ -420,7 +522,7 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
     departure_EVs <- data.frame()
 
     # Get the simulation day from SIM_DATES
-    sim_day <- SIM_DATES[simi]
+    sim_day <- SIM_START_DATE#SIM_DATES[simi]
 
     # Groupby the final trips based the EV source - destination for returning trips and
     # origin for departing trips
@@ -502,7 +604,7 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
             trip_count_OD <-
               nz_return_source$long_distance_return_trips[j]
 
-            if (nrow(trip_EVs) >= returning_counter + trip_count_OD - 1) {
+            if ((trip_count_OD > 0) && (nrow(trip_EVs) >= returning_counter + trip_count_OD - 1)) {
               trip_EVs_returning_OD <-
                 dplyr::slice(trip_EVs,
                              returning_counter:(returning_counter + trip_count_OD - 1))
@@ -515,10 +617,10 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
 
               if (dim(trip_EVs_returning_OD)[1] > 0) {
                 trip_EVs_returning_OD$origin_zip <- nz_return_source$origin[j]
-
+                trip_EVs_returning_OD$destination_zip <- nz_return_source$destination[j]
                 # Randomly assign SOCs to these vehicles, with replacement
                 trip_EVs_returning_OD$soc <-
-                  base::sample(SOC_LOWER_LIMIT:SOC_UPPER_LIMIT,
+                  base::sample(config$SOC_LOWER_LIMIT:config$SOC_UPPER_LIMIT,
                                trip_count_OD,
                                replace = TRUE)
 
@@ -607,7 +709,7 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
                 # This means that a trip can start anywhere where trip start time and end
                 # time such that it reaches the destination by around 10.00pm.
                 trip_time <-
-                  lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
+                  lubridate::hours(ceiling(dist / config$AVG_TRIP_SPEED))
                 det_updated <- det - trip_time
                 # If the trip is too long, then we might have to leave before 6.00am
                 if (det_updated <= dst) {
@@ -627,7 +729,7 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
 
                 # Find a start time that includes this trip time
                 dst <-
-                  trip_start_time + lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
+                  trip_start_time + lubridate::hours(ceiling(dist / config$AVG_TRIP_SPEED))
 
                 returning_trip_row <-
                   make_trip_row(
@@ -640,7 +742,8 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
 
                 prob_ij_bev <-
                   vcdm_scdm4(ev_range = trip_EV_returning_row$electric_range,
-                             trip_row = returning_trip_row)
+                             trip_row = returning_trip_row,
+                             config = config)
                 # print(prob_ij)
                 # Make a random draw based on this probability
                 ret_vehicle_choice <-
@@ -684,7 +787,7 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
               nz_departure_source$long_distance_departure_trips[j]
             # print("returning_counter")
             # print(returning_counter)
-            if (nrow(trip_EVs) >= returning_counter + departing_counter + trip_count_OD - 1) {
+            if ((trip_count_OD > 0) && (nrow(trip_EVs) >= returning_counter + departing_counter + trip_count_OD - 1)) {
               trip_EVs_departing_OD <-
                 dplyr::slice(
                   trip_EVs,
@@ -698,7 +801,7 @@ trip_gen <- function(num_days = 1, config, analysis_id = 15) {
 
               if (dim(trip_EVs_departing_OD)[1] > 0) {
                 trip_EVs_departing_OD$origin_zip <- nz_departure_source$origin[j]
-
+                trip_EVs_departing_OD$destination_zip <- nz_departure_source$destination[j]
                 # Randomly assign SOCs to these vehicles, with replacement
                 trip_EVs_departing_OD$soc <-
                   base::sample(config$SOC_LOWER_LIMIT:config$SOC_UPPER_LIMIT,

@@ -4,12 +4,14 @@
 \alias{trip_gen}
 \title{Create the EV fleet for ABM simulation based on SDCM VCDM}
 \usage{
-trip_gen(num_days = 1, config, analysis_id = 15)
+trip_gen(num_days = 1, config, a_id = 15)
 }
 \arguments{
 \item{num_days}{Number of days to generate the EV fleet for.}
 
 \item{config}{constants}
+
+\item{a_id}{analysis_id}
 }
 \value{
 Day EVs

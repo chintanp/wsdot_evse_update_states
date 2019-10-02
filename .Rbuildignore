@@ -2,3 +2,5 @@
 ^\.Rproj\.user$
 tic.R
 .travis.yml
+docs/
+config.yml
