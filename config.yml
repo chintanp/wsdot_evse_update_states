@@ -28,4 +28,5 @@ default:
   # Furthest restroom break
   AVG_RESTROOM_SPACING: 20 # miles
 
-
+  # The distance from the highway to look for charging stations
+  LOOKUP_DISTANCE: 10

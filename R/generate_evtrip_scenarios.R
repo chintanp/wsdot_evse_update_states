@@ -1,5 +1,6 @@
 
 
+
 #' Generate random date times between two date-times, for a timezone
 #' Adapted from : https://stackoverflow.com/a/14721124/1328232
 #'
@@ -589,17 +590,61 @@ read_from_database <- function(a_id) {
 trip_gen <- function(num_days = 1,
                      config,
                      a_id = 15) {
+  # Database settings -------------------------------------------------------
 
-  # Read the relevant data from the database
-  dbread <- read_from_database(a_id)
+  main_con <- DBI::dbConnect(
+    RPostgres::Postgres(),
+    host = Sys.getenv("MAIN_HOST"),
+    dbname = Sys.getenv("MAIN_DB"),
+    user = Sys.getenv("MAIN_USER"),
+    password = Sys.getenv("MAIN_PWD")
+  )
+
+
+  # Select queries ----------------------------------------------------------
+
+  # gas prices in WA
+  wa_gas_prices <-
+    DBI::dbGetQuery(main_con, 'select * from wa_gas_prices')
+
+  wa_bevs <-
+    DBI::dbGetQuery(main_con,
+                    "select veh_id, electric_range, zip_code, connector_code from wa_bevs")
+
+  # These are the results of the EV trips generation from PJ
+  wa_evtrips <-
+    DBI::dbGetQuery(main_con, 'select * from wa_evtrips')
+
+  od_sp <-
+    DBI::dbGetQuery(main_con, 'select * from od_sp')
+
+  od_cd <-
+    DBI::dbGetQuery(
+      main_con,
+      paste0(
+        'select origin, destination, min(cd_chademo) as cd_chademo, min(cd_combo) as cd_combo from od_cd where analysis_id = -1 or analysis_id =  ',
+        a_id,
+        ' group by origin, destination;'
+      )
+    )
+
+  dest_charger <- DBI::dbGetQuery(
+    main_con,
+    paste0(
+      'select zip, bool_or(dc_chademo) as dc_chademo, bool_or(dc_combo) as dc_combo, bool_or(dc_level2) as dc_level2 from dest_charger where analysis_id = -1 or analysis_id =  ',
+      a_id,
+      ' group by zip;'
+    )
+  )
+
 
   #daily EV trip counts
-  dbread$wa_evtrips$dep_calib_daily <- dbread$wa_evtrips$dep * 354.3496 / 30
-  dbread$wa_evtrips$ret_calib_daily <- dbread$wa_evtrips$ret * 354.3496 / 30
+  wa_evtrips$dep_calib_daily <-  wa_evtrips$dep * 354.3496 / 30
+  wa_evtrips$ret_calib_daily <-  wa_evtrips$ret * 354.3496 / 30
 
   # Make all NA distances to zero, since we wont be able to traverse on them avayway
   # EVentually we filter all OD pairs where the distance is less than a threshold
-  dbread$od_sp$shortest_path_length[which(is.na(od_sp$shortest_path_length))] <-
+  od_sp$shortest_path_length[which(is.na(od_sp$shortest_path_length))] <-
     0
 
   returning_counter <- 0
@@ -612,12 +657,12 @@ trip_gen <- function(num_days = 1,
     #print(" Finding the returning and departing EV trips for the day ")
 
     nz_return <-
-      create_return_df(od = dbread$wa_evtrips,
-                       od_sp = dbread$od_sp,
+      create_return_df(od =  wa_evtrips,
+                       od_sp =  od_sp,
                        config = config)
     nz_departure <-
-      create_departure_df(od = dbread$wa_evtrips,
-                          od_sp = dbread$od_sp,
+      create_departure_df(od =  wa_evtrips,
+                          od_sp =  od_sp,
                           config = config)
     # lg$debug(nz_return = nz_return,
     #          msg = paste("nz_return with rows ", nrow(nz_return)))
@@ -677,7 +722,7 @@ trip_gen <- function(num_days = 1,
       #           trips_source_i)
       # Find the EVs in the source zip code that could have made the trip
       source_EVs <-
-        dbread$wa_bevs %>% dplyr::filter(.data$zip_code == EV_req_tots$source[i])
+        wa_bevs %>% dplyr::filter(.data$zip_code == EV_req_tots$source[i])
       # lg$debug(source_EVs = source_EVs,
       #          msg = paste("source_EVs with rows ", nrow(source_EVs)))
       # If EVs are available in this zip code
@@ -703,7 +748,7 @@ trip_gen <- function(num_days = 1,
         if (EV_req_tots$returning_trips[i] > 0) {
           returning_counter <- 1
           nz_return_source <-
-            nz_return[nz_return$destination == EV_req_tots$source[i], ]
+            nz_return[nz_return$destination == EV_req_tots$source[i],]
           j <- 1
           for (j in 1:nrow(nz_return_source)) {
             # Find the number of trips between the OD pair
@@ -774,7 +819,7 @@ trip_gen <- function(num_days = 1,
                   trip_EVs_returning_g$veh_id[ii]
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_returning_row <-
-                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj], ]
+                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj],]
                 # print(paste("jj", jj, 'i', i, 'j', j))
 
                 # lg$info(paste("jj", jj, 'i', i, 'j', j))
@@ -804,13 +849,13 @@ trip_gen <- function(num_days = 1,
                   trip_EV_returning_row$destination_zip
                 # Find the row corresponding to the OD pair
                 trip_sp_ret <-
-                  dbread$od_sp %>% dplyr::filter(.data$origin == origin_zip,
+                  od_sp %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
                 trip_cd_ret <-
-                  dbread$od_cd %>% dplyr::filter(.data$origin == origin_zip,
+                  od_cd %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
                 trip_dc_ret <-
-                  dbread$dest_charger %>% dplyr::filter(.data$zip == destination_zip)
+                  dest_charger %>% dplyr::filter(.data$zip == destination_zip)
                 # Find the distance for the OD pair
                 dist <-
                   trip_sp_ret$shortest_path_length
@@ -843,7 +888,7 @@ trip_gen <- function(num_days = 1,
 
                 returning_trip_row <-
                   make_trip_row(
-                    gas_prices = dbread$wa_gas_prices,
+                    gas_prices =  wa_gas_prices,
                     trip_EV_row = trip_EV_returning_row,
                     trip_sp = trip_sp_ret,
                     trip_cd = trip_cd_ret,
@@ -883,8 +928,7 @@ trip_gen <- function(num_days = 1,
           lubridate::as_datetime(paste(sim_day, config$END_TIME), tz = "America/Los_Angeles")
         #print(returning_counter)
         returning_counter <- EV_req_tots$returning_trips[i]
-        #print(returning_counter)
-        # print(return_EVs)
+
         # departure ---------------------------------------------------------------
 
         # Iterate through each row - this iterates through an OD pair
@@ -892,7 +936,7 @@ trip_gen <- function(num_days = 1,
         if (EV_req_tots$departing_trips[i] > 0) {
           departing_counter <- 1
           nz_departure_source <-
-            nz_departure[nz_departure$origin == EV_req_tots$source[i], ]
+            nz_departure[nz_departure$origin == EV_req_tots$source[i],]
           for (j in 1:nrow(nz_departure_source)) {
             # Find the number of trips between the OD pair
             trip_count_OD <-
@@ -962,7 +1006,7 @@ trip_gen <- function(num_days = 1,
 
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_departing_row <-
-                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj], ]
+                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj],]
 
                 if (dim(trip_EV_departing_row)[1] == 0) {
                   browser()
@@ -985,13 +1029,13 @@ trip_gen <- function(num_days = 1,
                   trip_EV_departing_row$destination_zip
                 # Find the row corresponding to the OD pair
                 trip_sp_dep <-
-                  dbread$od_sp %>% dplyr::filter(.data$origin == origin_zip,
+                  od_sp %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
                 trip_cd_dep <-
-                  dbread$od_cd %>% dplyr::filter(.data$origin == origin_zip,
+                  od_cd %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
                 trip_dc_dep <-
-                  dbread$dest_charger %>% dplyr::filter(.data$zip == destination_zip)
+                  dest_charger %>% dplyr::filter(.data$zip == destination_zip)
                 # Find the distance for the OD pair
                 dist <-
                   trip_sp_dep$shortest_path_length
@@ -1020,7 +1064,7 @@ trip_gen <- function(num_days = 1,
 
                 departing_trip_row <-
                   make_trip_row(
-                    gas_prices = dbread$wa_gas_prices,
+                    gas_prices =  wa_gas_prices,
                     trip_EV_row = trip_EV_departing_row,
                     trip_sp = trip_sp_dep,
                     trip_cd = trip_cd_dep,
@@ -1055,8 +1099,6 @@ trip_gen <- function(num_days = 1,
           }
         }
 
-        # print("Generated trip EVs returning and departing with SOC and trip start times")
-        # Apply Yan's VCDM to each trip
         # reset the counters
         returning_counter <- 1
         departing_counter <- 1
@@ -1082,25 +1124,8 @@ trip_gen <- function(num_days = 1,
         DBI::dbAppendTable(main_con, 'evtrip_scenarios', evtrips_zip)
       }
 
-      # utils::write.csv(
-      #     day_EVs,
-      #     file = here::here("trip_scenarios",
-      #                       paste0(sim_day, ".csv")),
-      #     row.names = FALSE
-      # )
-
-      # write.csv(departure_EVs,
-      #           file = here::here(
-      #               "trip_scenarios",
-      #               paste("evtrips_departure_", simi, ".csv", sep =
-      #                         "")
-      #           ))
-      # return( day_EVs)
     }
-
   }
-
-
 }
 
 # trip_gen(num_days = 1)
