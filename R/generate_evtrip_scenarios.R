@@ -1,12 +1,5 @@
 
 
-# setwd(basedir)
-# source('./R/config.R')
-
-
-# Get the constants from the config file
-# config <- config::get()
-
 #' Generate random date times between two date-times, for a timezone
 #' Adapted from : https://stackoverflow.com/a/14721124/1328232
 #'
@@ -47,6 +40,7 @@ rnd_date_time <-
 #' @return The probability of travel by EV
 
 vcdm_scdm4 <- function(ev_range, trip_row, config) {
+  # Input Validation --------------------------------------------------------
 
   if (nrow(trip_row) == 0) {
     stop('trip_row has 0 rows - should have just 1')
@@ -66,13 +60,16 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
   if (is.null(config[['AVG_RENTAL_CAR_COST']])) {
     stop('config is missing the field `AVG_RENTAL_CAR_COST`')
   }
-  if (!(class(ev_range) == 'numeric' || class(ev_range) == 'integer') ) {
+  if (!(class(ev_range) == 'numeric' ||
+        class(ev_range) == 'integer')) {
     stop('ev_range is of non-numeric type - provide numeric value for ev_range')
   }
   if (ev_range <= 0) {
     stop('ev_range should be a positive value')
   }
-  # Vehicle choice decision model parameters
+
+  # VCDM Parameters ---------------------------------------------------------
+
   theta_1 <- -0.04
   theta_2 <- 0.059
   theta_3 <- -0.075
@@ -84,8 +81,8 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
   theta_9 <-  1.428 # (destination_charger Level_3)
   ASC_BEV <- 11.184
 
-  # Get the constants from the config file
-  # config <- config::get()
+
+  # Probability calculation ------------------------------------------------
 
   util_ij_ice <-
     theta_1 * trip_row$gas_price * trip_row$dist / config$AVG_FUEL_ECONOMY_OWN
@@ -124,6 +121,7 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
 #' @importFrom rlang .data
 #'
 create_return_df <- function(od, od_sp, config) {
+  # Input Validation --------------------------------------------------------
 
   if (dim(od)[1] == 0) {
     stop('od has 0 rows - should have atleast 1')
@@ -155,12 +153,15 @@ create_return_df <- function(od, od_sp, config) {
   if (is.null(config[['CRITICAL_DISTANCE']])) {
     stop('config is missing the field `CRITICAL_DISTANCE`')
   }
-  if (! (class(config[['CRITICAL_DISTANCE']]) == 'numeric' || class(config[['CRITICAL_DISTANCE']]) == 'integer') ) {
+  if (!(class(config[['CRITICAL_DISTANCE']]) == 'numeric' ||
+        class(config[['CRITICAL_DISTANCE']]) == 'integer')) {
     stop('`CRITICAL_DISTANCE` should be of class numeric')
   }
   if (config[['CRITICAL_DISTANCE']] < 0) {
     stop('`CRITICAL_DISTANCE` should be a positive number')
   }
+
+  # Assignment --------------------------------------------------------------
 
   #random draw from Poisson distribution
   daily_counts_ret <-
@@ -214,9 +215,8 @@ create_return_df <- function(od, od_sp, config) {
 #' @importFrom rlang .data
 #'
 create_departure_df <- function(od, od_sp, config) {
+  # Input Validation --------------------------------------------------------
 
-  # Get the constants from the config file
-  # config <- config::get()
   if (dim(od)[1] == 0) {
     stop('od has 0 rows - should have atleast 1')
   }
@@ -247,12 +247,15 @@ create_departure_df <- function(od, od_sp, config) {
   if (is.null(config[['CRITICAL_DISTANCE']])) {
     stop('config is missing the field `CRITICAL_DISTANCE`')
   }
-  if (!(class(config[['CRITICAL_DISTANCE']]) == 'numeric' || class(config[['CRITICAL_DISTANCE']]) == 'integer') ) {
+  if (!(class(config[['CRITICAL_DISTANCE']]) == 'numeric' ||
+        class(config[['CRITICAL_DISTANCE']]) == 'integer')) {
     stop('`CRITICAL_DISTANCE` should be of class numeric')
   }
   if (config[['CRITICAL_DISTANCE']] < 0) {
     stop('`CRITICAL_DISTANCE` should be a positive number')
   }
+
+  # Assignment --------------------------------------------------------------
 
   daily_counts_dep <-
     stats::rpois(dim(od)[1], od$dep_calib_daily)   #random draw from Poisson distribution
@@ -295,15 +298,20 @@ create_departure_df <- function(od, od_sp, config) {
 #'@return The selected trip EVs from the set of EVs at source
 #'
 get_tripEVs_from_sourceEVs <- function(trips_source_i, source_EVs) {
+  # Input validation --------------------------------------------------------
+
   if (!class(source_EVs) == 'data.frame') {
     stop('source_EVs should be of type data.frame')
   }
-  if (!(class(trips_source_i) == 'numeric' || class(trips_source_i) == 'integer')) {
+  if (!(class(trips_source_i) == 'numeric' ||
+        class(trips_source_i) == 'integer')) {
     stop('trips_source_i should be an integer or numeric value')
   }
   if (trips_source_i < 0) {
     stop('trips_source_i should be a positive integer')
   }
+
+  # Assignment --------------------------------------------------------------
 
   # An EV cannot make two trips in a day
   if (trips_source_i > nrow(source_EVs)) {
@@ -331,16 +339,20 @@ get_tripEVs_from_sourceEVs <- function(trips_source_i, source_EVs) {
 #' @return The gas price for the relevant zip code
 #'
 get_Gas_Price <- function(gas_prices, origin_zip) {
+  # Input validation -------------------------------------------------------
 
   if (!class(gas_prices) == 'data.frame') {
     stop('gas_prices should be of type data.frame')
   }
-  if (!(class(origin_zip) == 'numeric' || class(origin_zip) == 'integer')) {
+  if (!(class(origin_zip) == 'numeric' ||
+        class(origin_zip) == 'integer')) {
     stop('origin_zip should be an integer or numeric value')
   }
   if (origin_zip < 0) {
     stop('origin_zip should be a positive integer')
   }
+
+  # Gas price lookup --------------------------------------------------------
 
   gas_price <-
     gas_prices$avg_gas_price[gas_prices$zip == origin_zip]
@@ -370,9 +382,7 @@ make_trip_row <-
            trip_sp,
            trip_cd,
            trip_dc) {
-
-
-# Input validation --------------------------------------------------------
+    # Input validation --------------------------------------------------------
 
     if (!class(gas_prices) == 'data.frame') {
       stop('gas_prices should be of type data.frame')
@@ -392,17 +402,23 @@ make_trip_row <-
     if (!('connector_code' %in% colnames(trip_EV_row))) {
       stop('trip_EV_row should have a column connector_code')
     }
-    if (!(class(trip_EV_row$connector_code) == 'integer' || class(trip_EV_row$connector_code) == 'numeric')) {
+    if (!(
+      class(trip_EV_row$connector_code) == 'integer' ||
+      class(trip_EV_row$connector_code) == 'numeric'
+    )) {
       stop('column connector_code in trip_EV_row should be of type integer')
     }
     if (!('origin_zip' %in% colnames(trip_EV_row))) {
       stop('trip_EV_row should have a column origin_zip')
     }
-    if (!(class(trip_EV_row$origin_zip) == 'integer' || class(trip_EV_row$origin_zip) == 'numeric')) {
+    if (!(
+      class(trip_EV_row$origin_zip) == 'integer' ||
+      class(trip_EV_row$origin_zip) == 'numeric'
+    )) {
       stop('column origin_zip in trip_EV_row should be of type integer')
     }
 
-# Input correction --------------------------------------------------------
+    # Input correction --------------------------------------------------------
 
     # trip_cd is null, then give it path length
     if (rapportools::is.empty(trip_cd$cd_chademo)) {
@@ -424,7 +440,7 @@ make_trip_row <-
         trip_sp$shortest_path_length[1]
     }
 
-# Assignment --------------------------------------------------------------
+    # Assignment --------------------------------------------------------------
 
     if (trip_EV_row$connector_code == 1) {
       max_spacing <- trip_cd$cd_chademo # in miles
@@ -473,11 +489,10 @@ make_trip_row <-
     return(trip_row)
   }
 
+
+#' Read data from database
 #'
-#' Create the EV fleet for ABM simulation based on SDCM VCDM
-#'
-#' This function `trip_gen()` creates a fleet of EVs for EVI-ABM simulation
-#' using the published models or vehicle choice using static choice discrete models.
+#' This function `read_from_database()` reads the relevant data from the database.
 #'
 #'
 #' @param num_days Number of days to generate the EV fleet for.
@@ -487,16 +502,13 @@ make_trip_row <-
 #' @return Day EVs
 #'
 #' @export
-#' @examples
-#' f <- function(x) 42
+#'
 #' @import magrittr
 #' @importFrom utils data
 #' @importFrom rlang .data
 #'
-trip_gen <- function(num_days = 1, config, a_id = 15) {
-  # Get the constants from the config file
-  #  config <- config::get()
 
+read_from_database <- function(a_id) {
   # Database settings -------------------------------------------------------
 
   main_con <- DBI::dbConnect(
@@ -507,11 +519,16 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
     password = Sys.getenv("MAIN_PWD")
   )
 
+
+  # Select queries ----------------------------------------------------------
+
   # gas prices in WA
   wa_gas_prices <-
     DBI::dbGetQuery(main_con, 'select * from wa_gas_prices')
 
-  wa_bevs <- DBI::dbGetQuery(main_con, "select veh_id, electric_range, zip_code, connector_code from wa_bevs")
+  wa_bevs <-
+    DBI::dbGetQuery(main_con,
+                    "select veh_id, electric_range, zip_code, connector_code from wa_bevs")
 
   # These are the results of the EV trips generation from PJ
   wa_evtrips <-
@@ -538,16 +555,51 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
       ' group by zip;'
     )
   )
-  # all_trips_sp_df <-
-  #     readRDS(here::here("R", "all_trips_sp_df.Rds"))
+
+  return(
+    list(
+      wa_gas_prices = wa_gas_prices,
+      wa_bevs = wa_bevs,
+      wa_evtrips = wa_evtrips,
+      od_sp = od_sp,
+      od_cd = od_cd,
+      dest_charger = dest_charger
+    )
+  )
+}
+
+#' Create the EV fleet for ABM simulation based on SDCM VCDM
+#'
+#' This function `trip_gen()` creates a fleet of EVs for EVI-ABM simulation
+#' using the published models or vehicle choice using static choice discrete models.
+#'
+#'
+#' @param num_days Number of days to generate the EV fleet for.
+#' @param config constants
+#' @param a_id analysis_id
+#'
+#' @return Day EVs
+#'
+#' @export
+#'
+#' @import magrittr
+#' @importFrom utils data
+#' @importFrom rlang .data
+#'
+trip_gen <- function(num_days = 1,
+                     config,
+                     a_id = 15) {
+
+  # Read the relevant data from the database
+  dbread <- read_from_database(a_id)
 
   #daily EV trip counts
-  wa_evtrips$dep_calib_daily <- wa_evtrips$dep * 354.3496 / 30
-  wa_evtrips$ret_calib_daily <- wa_evtrips$ret * 354.3496 / 30
+  dbread$wa_evtrips$dep_calib_daily <- dbread$wa_evtrips$dep * 354.3496 / 30
+  dbread$wa_evtrips$ret_calib_daily <- dbread$wa_evtrips$ret * 354.3496 / 30
 
   # Make all NA distances to zero, since we wont be able to traverse on them avayway
   # EVentually we filter all OD pairs where the distance is less than a threshold
-  od_sp$shortest_path_length[which(is.na(od_sp$shortest_path_length))] <-
+  dbread$od_sp$shortest_path_length[which(is.na(od_sp$shortest_path_length))] <-
     0
 
   returning_counter <- 0
@@ -560,9 +612,13 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
     #print(" Finding the returning and departing EV trips for the day ")
 
     nz_return <-
-      create_return_df(od = wa_evtrips, od_sp = od_sp, config = config)
+      create_return_df(od = dbread$wa_evtrips,
+                       od_sp = dbread$od_sp,
+                       config = config)
     nz_departure <-
-      create_departure_df(od = wa_evtrips, od_sp = od_sp, config = config)
+      create_departure_df(od = dbread$wa_evtrips,
+                          od_sp = dbread$od_sp,
+                          config = config)
     # lg$debug(nz_return = nz_return,
     #          msg = paste("nz_return with rows ", nrow(nz_return)))
     # lg$debug(nz_departure =  nz_departure,
@@ -621,7 +677,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
       #           trips_source_i)
       # Find the EVs in the source zip code that could have made the trip
       source_EVs <-
-        wa_bevs %>% dplyr::filter(.data$zip_code == EV_req_tots$source[i])
+        dbread$wa_bevs %>% dplyr::filter(.data$zip_code == EV_req_tots$source[i])
       # lg$debug(source_EVs = source_EVs,
       #          msg = paste("source_EVs with rows ", nrow(source_EVs)))
       # If EVs are available in this zip code
@@ -647,14 +703,15 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
         if (EV_req_tots$returning_trips[i] > 0) {
           returning_counter <- 1
           nz_return_source <-
-            nz_return[nz_return$destination == EV_req_tots$source[i],]
+            nz_return[nz_return$destination == EV_req_tots$source[i], ]
           j <- 1
           for (j in 1:nrow(nz_return_source)) {
             # Find the number of trips between the OD pair
             trip_count_OD <-
               nz_return_source$long_distance_return_trips[j]
 
-            if ((trip_count_OD > 0) && (nrow(trip_EVs) >= returning_counter + trip_count_OD - 1)) {
+            if ((trip_count_OD > 0) &&
+                (nrow(trip_EVs) >= returning_counter + trip_count_OD - 1)) {
               trip_EVs_returning_OD <-
                 dplyr::slice(trip_EVs,
                              returning_counter:(returning_counter + trip_count_OD - 1))
@@ -667,12 +724,15 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
 
               if (dim(trip_EVs_returning_OD)[1] > 0) {
                 trip_EVs_returning_OD$origin_zip <- nz_return_source$origin[j]
-                trip_EVs_returning_OD$destination_zip <- nz_return_source$destination[j]
+                trip_EVs_returning_OD$destination_zip <-
+                  nz_return_source$destination[j]
                 # Randomly assign SOCs to these vehicles, with replacement
                 trip_EVs_returning_OD$soc <-
-                  base::sample(config$SOC_LOWER_LIMIT:config$SOC_UPPER_LIMIT,
-                               trip_count_OD,
-                               replace = TRUE)
+                  base::sample(
+                    config$SOC_LOWER_LIMIT:config$SOC_UPPER_LIMIT,
+                    trip_count_OD,
+                    replace = TRUE
+                  )
 
                 trip_EVs_returning <-
                   rbind(trip_EVs_returning,
@@ -714,7 +774,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
                   trip_EVs_returning_g$veh_id[ii]
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_returning_row <-
-                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj],]
+                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj], ]
                 # print(paste("jj", jj, 'i', i, 'j', j))
 
                 # lg$info(paste("jj", jj, 'i', i, 'j', j))
@@ -744,13 +804,13 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
                   trip_EV_returning_row$destination_zip
                 # Find the row corresponding to the OD pair
                 trip_sp_ret <-
-                  od_sp %>% dplyr::filter(.data$origin == origin_zip,
+                  dbread$od_sp %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
                 trip_cd_ret <-
-                  od_cd %>% dplyr::filter(.data$origin == origin_zip,
+                  dbread$od_cd %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
                 trip_dc_ret <-
-                  dest_charger %>% dplyr::filter(.data$zip == destination_zip)
+                  dbread$dest_charger %>% dplyr::filter(.data$zip == destination_zip)
                 # Find the distance for the OD pair
                 dist <-
                   trip_sp_ret$shortest_path_length
@@ -783,7 +843,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
 
                 returning_trip_row <-
                   make_trip_row(
-                    gas_prices = wa_gas_prices,
+                    gas_prices = dbread$wa_gas_prices,
                     trip_EV_row = trip_EV_returning_row,
                     trip_sp = trip_sp_ret,
                     trip_cd = trip_cd_ret,
@@ -791,9 +851,11 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
                   )
 
                 prob_ij_bev <-
-                  vcdm_scdm4(ev_range = trip_EV_returning_row$electric_range,
-                             trip_row = returning_trip_row,
-                             config = config)
+                  vcdm_scdm4(
+                    ev_range = trip_EV_returning_row$electric_range,
+                    trip_row = returning_trip_row,
+                    config = config
+                  )
                 # print(prob_ij)
                 # Make a random draw based on this probability
                 ret_vehicle_choice <-
@@ -830,14 +892,17 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
         if (EV_req_tots$departing_trips[i] > 0) {
           departing_counter <- 1
           nz_departure_source <-
-            nz_departure[nz_departure$origin == EV_req_tots$source[i],]
+            nz_departure[nz_departure$origin == EV_req_tots$source[i], ]
           for (j in 1:nrow(nz_departure_source)) {
             # Find the number of trips between the OD pair
             trip_count_OD <-
               nz_departure_source$long_distance_departure_trips[j]
             # print("returning_counter")
             # print(returning_counter)
-            if ((trip_count_OD > 0) && (nrow(trip_EVs) >= returning_counter + departing_counter + trip_count_OD - 1)) {
+            if ((trip_count_OD > 0) &&
+                (
+                  nrow(trip_EVs) >= returning_counter + departing_counter + trip_count_OD - 1
+                )) {
               trip_EVs_departing_OD <-
                 dplyr::slice(
                   trip_EVs,
@@ -851,12 +916,15 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
 
               if (dim(trip_EVs_departing_OD)[1] > 0) {
                 trip_EVs_departing_OD$origin_zip <- nz_departure_source$origin[j]
-                trip_EVs_departing_OD$destination_zip <- nz_departure_source$destination[j]
+                trip_EVs_departing_OD$destination_zip <-
+                  nz_departure_source$destination[j]
                 # Randomly assign SOCs to these vehicles, with replacement
                 trip_EVs_departing_OD$soc <-
-                  base::sample(config$SOC_LOWER_LIMIT:config$SOC_UPPER_LIMIT,
-                               trip_count_OD,
-                               replace = TRUE)
+                  base::sample(
+                    config$SOC_LOWER_LIMIT:config$SOC_UPPER_LIMIT,
+                    trip_count_OD,
+                    replace = TRUE
+                  )
 
                 trip_EVs_departing <-
                   rbind(trip_EVs_departing,
@@ -894,7 +962,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
 
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_departing_row <-
-                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj],]
+                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj], ]
 
                 if (dim(trip_EV_departing_row)[1] == 0) {
                   browser()
@@ -917,13 +985,13 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
                   trip_EV_departing_row$destination_zip
                 # Find the row corresponding to the OD pair
                 trip_sp_dep <-
-                  od_sp %>% dplyr::filter(.data$origin == origin_zip,
+                  dbread$od_sp %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
                 trip_cd_dep <-
-                  od_cd %>% dplyr::filter(.data$origin == origin_zip,
+                  dbread$od_cd %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
                 trip_dc_dep <-
-                  dest_charger %>% dplyr::filter(.data$zip == destination_zip)
+                  dbread$dest_charger %>% dplyr::filter(.data$zip == destination_zip)
                 # Find the distance for the OD pair
                 dist <-
                   trip_sp_dep$shortest_path_length
@@ -952,7 +1020,7 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
 
                 departing_trip_row <-
                   make_trip_row(
-                    gas_prices = wa_gas_prices,
+                    gas_prices = dbread$wa_gas_prices,
                     trip_EV_row = trip_EV_departing_row,
                     trip_sp = trip_sp_dep,
                     trip_cd = trip_cd_dep,
@@ -960,8 +1028,11 @@ trip_gen <- function(num_days = 1, config, a_id = 15) {
                   )
 
                 prob_ij_bev <-
-                  vcdm_scdm4(ev_range = trip_EV_departing_row$electric_range,
-                             trip_row = departing_trip_row, config = config)
+                  vcdm_scdm4(
+                    ev_range = trip_EV_departing_row$electric_range,
+                    trip_row = departing_trip_row,
+                    config = config
+                  )
 
                 # print(prob_ij)
                 dep_vehicle_choice <-
