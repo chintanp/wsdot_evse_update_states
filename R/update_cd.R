@@ -6,10 +6,6 @@
 # print(args)
 
 update_cd <- function(config, a_id) {
-  library("dplyr")
-  library("RPostgres")
-  library("DBI")
-  library("doParallel")
 
   # Find the number of cores in the system
   ncores <- parallel::detectCores()
@@ -23,10 +19,6 @@ update_cd <- function(config, a_id) {
 
   # Specify the libraries needed by workers
   parallel::clusterEvalQ(cl, {
-    library(DBI)
-    library(RPostgres)
-    library(glue)
-    library(dplyr)
 
     # Database settings -------------------------------------------------------
 
@@ -55,17 +47,20 @@ update_cd <- function(config, a_id) {
     password = Sys.getenv("MAIN_PWD")
   )
 
-# Find EVSES now ----------------------------------------------------------
+  # Find EVSES now ----------------------------------------------------------
 
+  # Get all new EVSEs for the said analysis_id where we have some fast charger
   query_nevses <-
-    paste0("select * from new_evses where analysis_id = ", a_id)
+    paste0("select * from new_evses where (combo_plug_count + chademo_plug_count) > 0 and analysis_id = ", a_id)
 
   nevses <- DBI::dbGetQuery(main_con, query_nevses)
 
+  # Get all the built evses
   query_bevses <- "select * from built_evse"
 
   bevses <- DBI::dbGetQuery(main_con, query_bevses)
 
+  # Select the necessary columns and rows with DCFC, as we are collecting Level2 as well
   bevses <-
     bevses[, c("bevse_id",
                "longitude",
@@ -76,6 +71,7 @@ update_cd <- function(config, a_id) {
 
   bevses$dcfc_count <- NULL
 
+  # Join the two dataframes to create the EVSES now
   evses_now <-
     bevses %>% dplyr::mutate(evse_id = paste0("b", bevse_id))
   evses_now$bevse_id <- NULL
@@ -101,6 +97,7 @@ update_cd <- function(config, a_id) {
 
   evses_now <- rbind(evses_now, nevses)
 
+  # Create a table with total evses
   DBI::dbWriteTable(main_con, paste0("evses_now", a_id), evses_now, overwrite = FALSE)
   # Make a unique table for each aalysis_id and drop if after the analysis is complete
   # dbWriteTable(main_con, "evses_now", evses_now)
@@ -110,21 +107,11 @@ update_cd <- function(config, a_id) {
   cd_chademo_g$ST_Length <- NULL
   cd_chademo_g$subs <- NULL
   cd_combo_g <- data.frame()
-  cd_combo_g$ST_Length <- NULL
-  cd_combo_g$subs <- NULL
 
-  # Specify the variables that the workers need access to
-  # parallel::clusterExport(cl,
-  #                         c('LOOKUP_DISTANCE',
-  #                           'CRITICAL_DISTANCE',
-  #                           'cd_chademo_g',
-  #                           'cd_combo_g',
-  #                           'chademo_ods',
-  #                           'combo_ods'))
-
-  # Find the roads closest to the new evses (one for each)
   i = 1
+  # Iterate through the new chargers
   for (i in 1:nrow(nevses)) {
+    # Find the charging distance geometry that is within the lookup distance from charging station
     query_od_chademo <-
       paste0(
         'select origin, destination from od_cd where st_dwithin(cd_chademo_geog, st_setsrid(st_makepoint(',
@@ -132,7 +119,7 @@ update_cd <- function(config, a_id) {
         ', ',
         nevses$latitude[i],
         '), 4326)::geography, ',
-        LOOKUP_DISTANCE,
+        config$LOOKUP_DISTANCE,
         '/0.000621371)'
       )
 
@@ -143,8 +130,7 @@ update_cd <- function(config, a_id) {
     parallel::clusterExport(
       cl,
       c(
-        'LOOKUP_DISTANCE',
-        'CRITICAL_DISTANCE',
+        'config',
         'cd_chademo_g',
         'cd_combo_g',
         'chademo_ods'
