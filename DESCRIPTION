@@ -28,6 +28,7 @@ Imports:
     roxygen2,
     magrittr,
     rlang,
-    config
+    config,
+    foreach
 RoxygenNote: 6.1.1
 StagedInstall: no 

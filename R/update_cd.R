@@ -5,8 +5,33 @@
 # args <- commandArgs(TRUE)
 # print(args)
 
+globalVariables('j')
+globalVariables('k')
+requireNamespace("foreach")
+#' Update the charging distances
+#'
+#' This function `update_cd()` updates the charging distances given the new set of charging stations.
+#'
+#' @param config constants
+#' @param a_id analysis_id
+#'
+#' @return
+#'
+#' @export
+#'
+#' @import magrittr
+#' @importFrom rlang .data
+#' @importFrom utils tail
+#' @import foreach
+#'
 update_cd <- function(config, a_id) {
 
+  library(dplyr)
+  library(magrittr)
+  library(foreach)
+  print("In update_cd")
+  requireNamespace("foreach")
+  print(str(config))
   # Find the number of cores in the system
   ncores <- parallel::detectCores()
   # Make a cluster and define and file to redirect stdout etc. from workers
@@ -19,6 +44,12 @@ update_cd <- function(config, a_id) {
 
   # Specify the libraries needed by workers
   parallel::clusterEvalQ(cl, {
+
+    library(DBI)
+    library(RPostgres)
+    library(glue)
+    library(dplyr)
+    library(doParallel)
 
     # Database settings -------------------------------------------------------
 
@@ -51,7 +82,10 @@ update_cd <- function(config, a_id) {
 
   # Get all new EVSEs for the said analysis_id where we have some fast charger
   query_nevses <-
-    paste0("select * from new_evses where (combo_plug_count + chademo_plug_count) > 0 and analysis_id = ", a_id)
+    paste0(
+      "select * from new_evses where (combo_plug_count + chademo_plug_count) > 0 and analysis_id = ",
+      a_id
+    )
 
   nevses <- DBI::dbGetQuery(main_con, query_nevses)
 
@@ -67,13 +101,13 @@ update_cd <- function(config, a_id) {
                "latitude",
                "connector_code",
                "dcfc_count")] %>%
-    dplyr::filter(dcfc_count >= 1)
+    dplyr::filter(.data$dcfc_count >= 1)
 
   bevses$dcfc_count <- NULL
 
   # Join the two dataframes to create the EVSES now
   evses_now <-
-    bevses %>% dplyr::mutate(evse_id = paste0("b", bevse_id))
+    bevses %>% dplyr::mutate(evse_id = paste0("b", .data$bevse_id))
   evses_now$bevse_id <- NULL
 
   nevses <-
@@ -83,11 +117,11 @@ update_cd <- function(config, a_id) {
                "chademo_plug_count",
                "combo_plug_count")] %>%
     dplyr::mutate(
-      evse_id = paste0("n", nevse_id),
+      evse_id = paste0("n", .data$nevse_id),
       connector_code = ifelse(
-        chademo_plug_count >= 1,
-        ifelse(combo_plug_count >= 1, 3, 1),
-        ifelse(combo_plug_count >= 1, 2, 0)
+        .data$chademo_plug_count >= 1,
+        ifelse(.data$combo_plug_count >= 1, 3, 1),
+        ifelse(.data$combo_plug_count >= 1, 2, 0)
       )
     )
 
@@ -127,15 +161,11 @@ update_cd <- function(config, a_id) {
     chademo_ods <- DBI::dbGetQuery(main_con, query_od_chademo)
 
     # Specify the variables that the workers need access to
-    parallel::clusterExport(
-      cl,
-      c(
-        'config',
-        'cd_chademo_g',
-        'cd_combo_g',
-        'chademo_ods'
-      )
-    )
+    parallel::clusterExport(cl,
+                            c('config',
+                              'cd_chademo_g',
+                              'cd_combo_g',
+                              'chademo_ods'), envir=environment())
 
     if (nrow(chademo_ods) > 0) {
       # Find the new charging distance for the OD pairs using the new fleet of EVSEs
@@ -168,7 +198,7 @@ update_cd <- function(config, a_id) {
           ',',
           dest_j,
           '))), cast(',
-          LOOKUP_DISTANCE,
+          config$LOOKUP_DISTANCE,
           '/0.000621371 as float))) as data ORDER BY ratios ASC) as foo'
           )
 
@@ -176,7 +206,7 @@ update_cd <- function(config, a_id) {
         print("query_chadmeo done")
         # Find the successive difference in ratios
         rat_chademo <-
-          dplyr::as_tibble(rat_chademo) %>% mutate(diff_chademo = ratios - lag(ratios))
+          dplyr::as_tibble(rat_chademo) %>% dplyr::mutate(diff_chademo = .data$ratios - dplyr::lag(.data$ratios))
         # Find the index of the ratio with maximum difference - this is the maximum
         # spacing between charging stations along the route
         max_index <- which.max(rat_chademo$diff_chademo)
@@ -233,7 +263,7 @@ update_cd <- function(config, a_id) {
         ', ',
         nevses$latitude[i],
         '), 4326)::geography, ',
-        LOOKUP_DISTANCE,
+        config$LOOKUP_DISTANCE,
         '/0.000621371)'
       )
 
@@ -244,12 +274,11 @@ update_cd <- function(config, a_id) {
     parallel::clusterExport(
       cl,
       c(
-        'LOOKUP_DISTANCE',
-        'CRITICAL_DISTANCE',
+        'config',
         'cd_chademo_g',
         'cd_combo_g',
         'combo_ods'
-      )
+      ), envir=environment()
     )
 
     if (nrow(combo_ods) > 0) {
@@ -283,7 +312,7 @@ update_cd <- function(config, a_id) {
           ',',
           dest_k,
           '))), cast(',
-          LOOKUP_DISTANCE,
+          config$LOOKUP_DISTANCE,
           '/0.000621371 as float))) as data ORDER BY ratios ASC) as foo'
           )
 
@@ -292,7 +321,7 @@ update_cd <- function(config, a_id) {
         print("query_combo done")
         # Find the successive difference in ratios
         rat_combo <-
-          dplyr::as_tibble(rat_combo) %>% mutate(diff_combo = ratios - lag(ratios))
+          dplyr::as_tibble(rat_combo) %>% dplyr::mutate(diff_combo = .data$ratios - dplyr::lag(.data$ratios))
         # Find the index of the ratio with maximum difference - this is the maximum
         # spacing between charging stations along the route
         max_index <- which.max(rat_combo$diff_combo)
@@ -346,6 +375,6 @@ update_cd <- function(config, a_id) {
 
   DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
 
-  stopCluster(cl)
-  stopImplicitCluster()
+  parallel::stopCluster(cl)
+  doParallel::stopImplicitCluster()
   }

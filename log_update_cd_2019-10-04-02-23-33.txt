@@ -1,0 +1,152 @@
+starting worker pid=8836 on localhost:11671 at 02:23:33.331
+starting worker pid=4528 on localhost:11671 at 02:23:33.513
+starting worker pid=16244 on localhost:11671 at 02:23:33.694
+starting worker pid=17576 on localhost:11671 at 02:23:33.870
+starting worker pid=18248 on localhost:11671 at 02:23:34.055
+starting worker pid=16336 on localhost:11671 at 02:23:34.261
+starting worker pid=4908 on localhost:11671 at 02:23:34.450
+starting worker pid=3408 on localhost:11671 at 02:23:34.621
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+
+Attaching package: 'dplyr'
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+
+Attaching package: 'dplyr'
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+Loading required package: foreach
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: 'dplyr'
+
+Loading required package: foreach
+Loading required package: foreach
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+Loading required package: foreach
+om 'package:base':
+
+    intersect, setdiff, setequal, union
+
+Loading required package: foreach
+Loading required package: foreach
+
+Attaching package: 'dplyr'
+
+The following object is masked from 'package:glue':
+
+    collapse
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+Loading required package: foreach
+Loading required package: foreach
+Loading required package: iterators
+Loading required package: iterators
+Loading required package: iterators
+Loading required package: iterators
+Loading required package: iterators
+Loading required package: iterators
+Loading required package: parallel
+Loading required package: iterators
+Loading required package: parallel
+Loading required package: parallel
+Loading required package: parallel
+Loading required package: iterators
+Loading required package: parallel
+Loading required package: parallel
+Loading required package: parallel
+Loading required package: parallel

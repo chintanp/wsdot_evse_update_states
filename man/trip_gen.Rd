@@ -20,6 +20,3 @@ Day EVs
 This function `trip_gen()` creates a fleet of EVs for EVI-ABM simulation
 using the published models or vehicle choice using static choice discrete models.
 }
-\examples{
-f <- function(x) 42
-}

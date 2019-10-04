@@ -490,85 +490,6 @@ make_trip_row <-
     return(trip_row)
   }
 
-
-#' Read data from database
-#'
-#' This function `read_from_database()` reads the relevant data from the database.
-#'
-#'
-#' @param num_days Number of days to generate the EV fleet for.
-#' @param config constants
-#' @param a_id analysis_id
-#'
-#' @return Day EVs
-#'
-#' @export
-#'
-#' @import magrittr
-#' @importFrom utils data
-#' @importFrom rlang .data
-#'
-
-read_from_database <- function(a_id) {
-  # Database settings -------------------------------------------------------
-
-  main_con <- DBI::dbConnect(
-    RPostgres::Postgres(),
-    host = Sys.getenv("MAIN_HOST"),
-    dbname = Sys.getenv("MAIN_DB"),
-    user = Sys.getenv("MAIN_USER"),
-    password = Sys.getenv("MAIN_PWD")
-  )
-
-
-  # Select queries ----------------------------------------------------------
-
-  # gas prices in WA
-  wa_gas_prices <-
-    DBI::dbGetQuery(main_con, 'select * from wa_gas_prices')
-
-  wa_bevs <-
-    DBI::dbGetQuery(main_con,
-                    "select veh_id, electric_range, zip_code, connector_code from wa_bevs")
-
-  # These are the results of the EV trips generation from PJ
-  wa_evtrips <-
-    DBI::dbGetQuery(main_con, 'select * from wa_evtrips')
-
-  od_sp <-
-    DBI::dbGetQuery(main_con, 'select * from od_sp')
-
-  od_cd <-
-    DBI::dbGetQuery(
-      main_con,
-      paste0(
-        'select origin, destination, min(cd_chademo) as cd_chademo, min(cd_combo) as cd_combo from od_cd where analysis_id = -1 or analysis_id =  ',
-        a_id,
-        ' group by origin, destination;'
-      )
-    )
-
-  dest_charger <- DBI::dbGetQuery(
-    main_con,
-    paste0(
-      'select zip, bool_or(dc_chademo) as dc_chademo, bool_or(dc_combo) as dc_combo, bool_or(dc_level2) as dc_level2 from dest_charger where analysis_id = -1 or analysis_id =  ',
-      a_id,
-      ' group by zip;'
-    )
-  )
-
-  return(
-    list(
-      wa_gas_prices = wa_gas_prices,
-      wa_bevs = wa_bevs,
-      wa_evtrips = wa_evtrips,
-      od_sp = od_sp,
-      od_cd = od_cd,
-      dest_charger = dest_charger
-    )
-  )
-}
-
 #' Create the EV fleet for ABM simulation based on SDCM VCDM
 #'
 #' This function `trip_gen()` creates a fleet of EVs for EVI-ABM simulation
@@ -590,6 +511,11 @@ read_from_database <- function(a_id) {
 trip_gen <- function(num_days = 1,
                      config,
                      a_id = 15) {
+
+
+  library(dplyr)
+  library(magrittr)
+
   # Database settings -------------------------------------------------------
 
   main_con <- DBI::dbConnect(
