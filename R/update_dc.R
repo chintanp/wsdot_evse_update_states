@@ -2,7 +2,7 @@
 # # EVSEs entered
 #
 
-update_dc <- function (a_id) {
+update_dc <- function(a_id) {
 
   library(dplyr)
   library(magrittr)
@@ -13,7 +13,8 @@ update_dc <- function (a_id) {
     host = Sys.getenv("MAIN_HOST"),
     dbname = Sys.getenv("MAIN_DB"),
     user = Sys.getenv("MAIN_USER"),
-    password = Sys.getenv("MAIN_PWD")
+    password = Sys.getenv("MAIN_PWD"),
+    port = Sys.getenv("MAIN_PORT")
   )
 
   query_wazip <- "select * from zipcode_record where state = 'WA'"
@@ -43,12 +44,18 @@ update_dc <- function (a_id) {
     idwithin$dc_combo <- FALSE
     idwithin$dc_level2 <- FALSE
     # If any chademo chargers are added, then the dc_chademo is updated
-    if (nevses$chademo_plug_count[i] >= 1) {
-      idwithin$dc_chademo <- idwithin$st_dwithin
+    if (nevses$dcfc_plug_count[i] >= 1) {
+      if (nevses$connector_code == 1) {
+        idwithin$dc_chademo <- idwithin$st_dwithin
+      } else if (nevses$connector_code == 2) {
+        idwithin$dc_combo <- idwithin$st_dwithin
+      } else if (nevses$connector_code == 3) {
+        idwithin$dc_combo <- idwithin$st_dwithin
+        idwithin$dc_chademo <- idwithin$st_dwithin
+      }
+
     }
-    if (nevses$combo_plug_count[i] >= 1) {
-      idwithin$dc_combo <- idwithin$st_dwithin
-    }
+
     if (nevses$level2_plug_count[i] >= 1) {
       idwithin$dc_level2 <- idwithin$st_dwithin
     }
@@ -64,4 +71,6 @@ update_dc <- function (a_id) {
 
 
   }
+
+  DBI::dbDisconnect(main_con)
 }

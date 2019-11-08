@@ -523,7 +523,8 @@ trip_gen <- function(num_days = 1,
     host = Sys.getenv("MAIN_HOST"),
     dbname = Sys.getenv("MAIN_DB"),
     user = Sys.getenv("MAIN_USER"),
-    password = Sys.getenv("MAIN_PWD")
+    password = Sys.getenv("MAIN_PWD"),
+    port = Sys.getenv("MAIN_PORT")
   )
 
 
@@ -599,7 +600,7 @@ trip_gen <- function(num_days = 1,
     departure_EVs <- data.frame()
 
     # Get the simulation day from SIM_DATES
-    sim_day <- SIM_START_DATE#SIM_DATES[simi]
+    sim_day <- config$SIM_START_DATE#SIM_DATES[simi]
 
     # Groupby the final trips based the EV source - destination for returning trips and
     # origin for departing trips
@@ -663,9 +664,9 @@ trip_gen <- function(num_days = 1,
         }
         # Randomly assign trip start times
         dst <-
-          lubridate::as_datetime(paste(sim_day, START_TIME), tz = "America/Los_Angeles")
+          lubridate::as_datetime(paste(sim_day, config$START_TIME), tz = "America/Los_Angeles")
         det <-
-          lubridate::as_datetime(paste(sim_day, END_TIME), tz = "America/Los_Angeles")
+          lubridate::as_datetime(paste(sim_day, config$END_TIME), tz = "America/Los_Angeles")
 
         # return ------------------------------------------------------------------
 
@@ -755,7 +756,7 @@ trip_gen <- function(num_days = 1,
                 # )
 
                 if (dim(trip_EV_returning_row)[1] == 0) {
-                  browser()
+                  # browser()
                   # lg$trace(
                   #   msg = paste(
                   #     "trip_EV_returning_row has no rows just schema, jj: ",
@@ -986,7 +987,7 @@ trip_gen <- function(num_days = 1,
                 trip_EV_departing_row$dist <- dist
 
                 dst <-
-                  trip_start_time + lubridate::hours(ceiling(dist / AVG_TRIP_SPEED))
+                  trip_start_time + lubridate::hours(ceiling(dist / config$AVG_TRIP_SPEED))
 
                 departing_trip_row <-
                   make_trip_row(
@@ -1052,6 +1053,8 @@ trip_gen <- function(num_days = 1,
 
     }
   }
+
+  DBI::dbDisconnect(main_con)
 }
 
 # trip_gen(num_days = 1)

@@ -38,3 +38,12 @@ vignettes/*.pdf
 
 rsconnect/
 .Rproj.user
+
+
+# Repo specific
+*.txt
+logs/
+R/GAMA/
+R/logs
+
+
