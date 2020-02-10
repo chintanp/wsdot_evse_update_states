@@ -44,6 +44,6 @@ rsconnect/
 *.txt
 logs/
 R/GAMA/
-R/logs
+R/logs/
 
 
