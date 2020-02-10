@@ -24,19 +24,34 @@ requireNamespace("foreach")
 #' @importFrom utils tail
 #' @import foreach
 #'
-update_cd <- function(config, a_id) {
+update_cd <- function(config, a_id = 15) {
   library(dplyr)
   library(magrittr)
   library(foreach)
-  print("In update_cd")
+  library(ipify)
+  library(lgr)
+
+  lg <- get_logger("test")$set_propagate(FALSE)$set_appenders(lgr::AppenderJson$new(layout = LayoutLogstash$new(), file = here::here(paste0("logs/runner_", as.character(a_id), ".log"))))
+
+  # print("In update_cd")
   requireNamespace("foreach")
-  print(str(config))
+  # print(str(config))
+  # print(a_id)
+  if (is.na(a_id)) {
+    print("missing indeed")
+    lg$log(
+      level = "fatal",
+      msg = "Analysis_id not passed in charging distance calc",
+      "ip" = get_ip()
+    )
+    # a_id  <-  99
+  }
+  # print(a_id)
   # Find the number of cores in the system
   ncores <- parallel::detectCores()
   # Make a cluster and define and file to redirect stdout etc. from workers
   cl <-
-    parallel::makeCluster(ncores, outfile = paste0(
-      "logs/log_update_cd_",
+    parallel::makeCluster(ncores, outfile = paste0("log_update_cd_",
       format(Sys.time(), "%Y-%m-%d-%H-%M-%S"),
       ".txt"
     ))
@@ -48,6 +63,9 @@ update_cd <- function(config, a_id) {
     library(glue)
     library(dplyr)
     library(doParallel)
+    library(ipify)
+    library(lgr)
+
 
     # Database settings -------------------------------------------------------
 
@@ -154,7 +172,9 @@ update_cd <- function(config, a_id) {
                               c('config',
                                 'cd_chademo_g',
                                 'cd_combo_g',
-                                'chademo_ods'),
+                                'chademo_ods',
+                                'a_id',
+                                'lg'),
                               envir = environment())
 
       if (nrow(chademo_ods) > 0) {
@@ -166,6 +186,15 @@ update_cd <- function(config, a_id) {
           .combine = "rbind"
         ) %dopar% {
           print(paste0("In chademo j is: ", j, " of ", nrow(chademo_ods)))
+          print(paste0("analysis_id: ", a_id))
+
+
+          lg$log(
+            level = "info",
+            msg = paste0("In chademo j is: ", j, " of ", nrow(chademo_ods)),
+            "ip" = get_ip(),
+            "status" = "beginning processing"
+          )
 
           orig_j <- chademo_ods$origin[j]
           dest_j <- chademo_ods$destination[j]
@@ -194,6 +223,13 @@ update_cd <- function(config, a_id) {
 
           rat_chademo <- DBI::dbGetQuery(main_con, query_chademo)
           print("query_chadmeo done")
+          lg$log(
+            level = "info",
+            msg = paste0("In chademo j is: ", j, " of ", nrow(chademo_ods)),
+            "ip" = get_ip(),
+            "status" = "query_chademo done"
+          )
+
           # Find the successive difference in ratios
           rat_chademo <-
             dplyr::as_tibble(rat_chademo) %>% dplyr::mutate(diff_chademo = .data$ratios - dplyr::lag(.data$ratios))
@@ -225,6 +261,12 @@ update_cd <- function(config, a_id) {
           cd_chademo_g <- DBI::dbGetQuery(main_con, query_chademo2)
 
           print("query_chadmeo2 done")
+          lg$log(
+            level = "info",
+            msg = paste0("In chademo j is: ", j, " of ", nrow(chademo_ods)),
+            "ip" = get_ip(),
+            "status" = "query_chademo2 done"
+          )
 
           query_insert <-
             paste0(
@@ -238,11 +280,17 @@ update_cd <- function(config, a_id) {
               cd_chademo_g$subs,
               "', ",
               a_id,
-              ');'
+              ') on conflict on constraint od_cd_pkey do update set cd_chademo = EXCLUDED.cd_chademo, cd_chademo_geog = EXCLUDED.cd_chademo_geog;'
             )
 
           DBI::dbGetQuery(main_con, query_insert)
           print("query_insert done")
+          lg$log(
+            level = "info",
+            msg = paste0("In chademo j is: ", j, " of ", nrow(chademo_ods)),
+            "ip" = get_ip(),
+            "status" = "query_insert done"
+          )
         }
       }
 
@@ -276,7 +324,15 @@ update_cd <- function(config, a_id) {
           .noexport = "main_con",
           .combine = "rbind"
         ) %dopar% {
+
           print(paste0("In combo k is: ", k, " of ", nrow(combo_ods)))
+
+          lg$log(
+            level = "info",
+            paste0("In combo k is: ", k, " of ", nrow(combo_ods)),
+            "ip" = get_ip(),
+            "status" = "beginning processing"
+          )
 
           orig_k <- combo_ods$origin[k]
           dest_k <- combo_ods$destination[k]
@@ -306,6 +362,13 @@ update_cd <- function(config, a_id) {
           rat_combo <- DBI::dbGetQuery(main_con, query_combo)
 
           print("query_combo done")
+          lg$log(
+            level = "info",
+            paste0("In combo k is: ", k, " of ", nrow(combo_ods)),
+            "ip" = get_ip(),
+            "status" = "query_combo done"
+          )
+
           # Find the successive difference in ratios
           rat_combo <-
             dplyr::as_tibble(rat_combo) %>% dplyr::mutate(diff_combo = .data$ratios - dplyr::lag(.data$ratios))
@@ -338,6 +401,13 @@ update_cd <- function(config, a_id) {
             DBI::dbGetQuery(main_con, query_combo2)
 
           print("query_combo2 done")
+          lg$log(
+            level = "info",
+            paste0("In combo k is: ", k, " of ", nrow(combo_ods)),
+            "ip" = get_ip(),
+            "status" = "query_combo2 done"
+          )
+
           query_update <-
             paste0(
               'update od_cd set cd_combo = ',
@@ -355,6 +425,12 @@ update_cd <- function(config, a_id) {
 
           DBI::dbGetQuery(main_con, query_update)
           print("query_update done")
+          lg$log(
+            level = "info",
+            paste0("In combo k is: ", k, " of ", nrow(combo_ods)),
+            "ip" = get_ip(),
+            "status" = "query_update done"
+          )
 
         }
       }

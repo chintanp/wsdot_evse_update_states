@@ -515,6 +515,22 @@ trip_gen <- function(num_days = 1,
 
   library(dplyr)
   library(magrittr)
+  library(ipify)
+  library(lgr)
+
+  lg <- get_logger("test")$set_propagate(FALSE)$set_appenders(lgr::AppenderJson$new(layout = LayoutLogstash$new(), file = here::here(paste0("logs/runner_", as.character(a_id), ".log"))))
+
+  if (is.na(a_id)) {
+    print("missing indeed")
+    lg$log(
+      level = "fatal",
+      msg = "Analysis_id not passed in trip gen calc",
+      "ip" = get_ip()
+    )
+    # a_id  <-  99
+  }
+
+  # print(a_id)
 
   # Database settings -------------------------------------------------------
 
@@ -536,7 +552,7 @@ trip_gen <- function(num_days = 1,
 
   wa_bevs <-
     DBI::dbGetQuery(main_con,
-                    "select veh_id, electric_range, zip_code, connector_code from wa_bevs")
+                    "select veh_id, range_fe, zip_code, connector_code, make from wa_bevs")
 
   # These are the results of the EV trips generation from PJ
   wa_evtrips <-
@@ -564,6 +580,21 @@ trip_gen <- function(num_days = 1,
     )
   )
 
+  include_tesla_flag <- DBI::dbGetQuery(main_con, paste0("select include_tesla from analysis_record where analysis_id = ", a_id))$include_tesla
+
+  if (!include_tesla_flag) {
+    print("No teslas in the simulation")
+    lg$log(
+      level = "info",
+      msg = "No teslas in simulation",
+      "ip" = get_ip()
+    )
+
+    wa_evtrips$oevs  <- NULL
+    wa_evtrips$devs  <- NULL
+    wa_evtrips <- wa_evtrips %>% dplyr::rename(oevs = oevs_no_tesla, devs = devs_no_tesla)
+    wa_bevs <- wa_bevs %>% dplyr::filter(!(make == 'Tesla'))
+  }
 
   #daily EV trip counts
   wa_evtrips$dep_calib_daily <-  wa_evtrips$dep * 354.3496 / 30
@@ -632,6 +663,13 @@ trip_gen <- function(num_days = 1,
         returning_trips = .data$n.x,
         departing_trips = .data$n.y
       )
+
+    lg$log(
+      level = "debug",
+      msg = paste("EV_req_tots with rows ", nrow(EV_req_tots)),
+      "EV_req_tots" = EV_req_tots,
+      "ip" = get_ip()
+    )
     # lg$trace(EV_req_tots = EV_req_tots,
     #          msg = paste("EV_req_tots with rows ", nrow(EV_req_tots)))
     # Make random draws from the EVs at the source, for completing these many trips
@@ -824,14 +862,25 @@ trip_gen <- function(num_days = 1,
 
                 prob_ij_bev <-
                   vcdm_scdm4(
-                    ev_range = trip_EV_returning_row$electric_range,
+                    ev_range = trip_EV_returning_row$range_fe,
                     trip_row = returning_trip_row,
                     config = config
                   )
+
                 # print(prob_ij)
                 # Make a random draw based on this probability
                 ret_vehicle_choice <-
                   stats::rbinom(1, 1, prob_ij_bev)
+
+                lg$log(
+                  level = "debug",
+                  msg = "Calculating returning trip vehicle choice",
+                  "ev_range" = trip_EV_returning_row$range_fe,
+                  "trip_row" = returning_trip_row,
+                  "prob_ij_bev" = prob_ij_bev,
+                  "ret_vehicle_choice" = ret_vehicle_choice,
+                  "ip" = get_ip()
+                )
 
                 if (ret_vehicle_choice == 1) {
                   # Add the rows for an OD pair to the total dataframe
@@ -1000,7 +1049,7 @@ trip_gen <- function(num_days = 1,
 
                 prob_ij_bev <-
                   vcdm_scdm4(
-                    ev_range = trip_EV_departing_row$electric_range,
+                    ev_range = trip_EV_departing_row$range_fe,
                     trip_row = departing_trip_row,
                     config = config
                   )
@@ -1008,6 +1057,16 @@ trip_gen <- function(num_days = 1,
                 # print(prob_ij)
                 dep_vehicle_choice <-
                   stats::rbinom(1, 1, prob_ij_bev)
+
+                lg$log(
+                  level = "debug",
+                  "ev_range" = trip_EV_departing_row$range_fe,
+                  "trip_row" = departing_trip_row,
+                  "prob_ij_bev" = prob_ij_bev,
+                  "dep_vehicle_choice" = dep_vehicle_choice,
+                  "ip" = get_ip(),
+                  msg = "Calculating departing trip vehicle choice"
+                )
 
                 if (dep_vehicle_choice == 1) {
                   # Add the rows for an OD pair to the total dataframe
