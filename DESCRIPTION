@@ -1,0 +1,32 @@
+Package: tripgen
+Type: Package
+Title: This Package Generates the EV Trips Per Day For the State of WA 
+Version: 0.1.0
+Author: Chintan Pathak (cp84@uw.edu)
+Maintainer: Chintan Pathak <chintan.pathak@gmail.com>
+Description: This package takes the long distance travel demand model and from long distance passenger trips, finds the long distance EV trips for any given day.
+License: MIT License
+Encoding: UTF-8
+LazyData: true
+Imports: 
+    data.table (>= 1.12.3),
+    rapportools,
+    dplyr,
+    RPostgres,
+    DBI,
+    doParallel,
+    lgr,
+    jsonlite,
+    rotor,
+    lubridate,
+    stats,
+    testthat,
+    utils,
+    roxygen2,
+    magrittr,
+    rlang,
+    config,
+    foreach, 
+    here
+RoxygenNote: 7.1.1
+StagedInstall: no

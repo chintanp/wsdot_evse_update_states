@@ -12,11 +12,6 @@ default:
   # We generate trial EV agents to run simulations between these dates
   SIM_START_DATE: !expr as.POSIXct("2019/07/01")
   SIM_END_DATE: !expr as.POSIXct("2019/08/01")
-  SIM_DATES: !expr seq.Date(
-          from = as.Date(SIM_START_DATE),
-          to = as.Date(SIM_END_DATE),
-          by = "day"
-      )
 
   # A low trip average speed for calculating subsequent trips
   AVG_TRIP_SPEED: 40 # mph
@@ -32,3 +27,9 @@ default:
 
   # Furthest restroom break
   AVG_RESTROOM_SPACING: 20 # miles
+
+  # The distance from the highway to look for charging stations
+  LOOKUP_DISTANCE: 10
+
+  # Global seed for all random number generations
+  GLOBAL_SEED: 123
