@@ -4,16 +4,18 @@
 \alias{make_trip_row}
 \title{This function creates a dataframe with trip details needed for the VCDM.}
 \usage{
-make_trip_row(gas_prices, trip_EV_row, trip_sp, trip_cd, trip_dc)
+make_trip_row(main_con, a_id = 1, gas_prices, trip_EV_row, trip_sp, trip_dc)
 }
 \arguments{
+\item{main_con}{The database connection passed to another function}
+
+\item{a_id}{The analysis_id}
+
 \item{gas_prices}{The dataframe containing gas prices for each zip code}
 
 \item{trip_EV_row}{The dataframe containing details about the EV taking the trip}
 
 \item{trip_sp}{Dataframe containing trip shortest_path}
-
-\item{trip_cd}{Dataframe with trip charging_distances}
 
 \item{trip_dc}{Dataframe with trip destination chargers}
 }
