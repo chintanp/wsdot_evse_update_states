@@ -1,5 +1,10 @@
 
 
+
+
+
+
+
 #' Generate random date times between two date-times, for a timezone
 #' Adapted from : https://stackoverflow.com/a/14721124/1328232
 #'
@@ -313,36 +318,37 @@ create_departure_df <- function(od, od_sp, config) {
 #'
 #'@return The selected trip EVs from the set of EVs at source
 #'
-get_tripEVs_from_sourceEVs <- function(trips_source_i, source_EVs, config) {
-  # Input validation --------------------------------------------------------
+get_tripEVs_from_sourceEVs <-
+  function(trips_source_i, source_EVs, config) {
+    # Input validation --------------------------------------------------------
 
-  if (!class(source_EVs) == 'data.frame') {
-    stop('source_EVs should be of type data.frame')
+    if (!class(source_EVs) == 'data.frame') {
+      stop('source_EVs should be of type data.frame')
+    }
+    if (!(class(trips_source_i) == 'numeric' ||
+          class(trips_source_i) == 'integer')) {
+      stop('trips_source_i should be an integer or numeric value')
+    }
+    if (trips_source_i < 0) {
+      stop('trips_source_i should be a positive integer')
+    }
+
+    # Assignment --------------------------------------------------------------
+
+    # An EV cannot make two trips in a day
+    if (trips_source_i > nrow(source_EVs)) {
+      trips_source_i <- nrow(source_EVs)
+
+    }
+
+    set.seed(config[['GLOBAL_SEED']])
+
+    # Randomly pick EVs from the relevant EVs "without replacement"
+    trip_EVs <-
+      dplyr::sample_n(source_EVs, trips_source_i, replace = FALSE)
+
+    return(trip_EVs)
   }
-  if (!(class(trips_source_i) == 'numeric' ||
-        class(trips_source_i) == 'integer')) {
-    stop('trips_source_i should be an integer or numeric value')
-  }
-  if (trips_source_i < 0) {
-    stop('trips_source_i should be a positive integer')
-  }
-
-  # Assignment --------------------------------------------------------------
-
-  # An EV cannot make two trips in a day
-  if (trips_source_i > nrow(source_EVs)) {
-    trips_source_i <- nrow(source_EVs)
-
-  }
-
-  set.seed(config[['GLOBAL_SEED']])
-
-  # Randomly pick EVs from the relevant EVs "without replacement"
-  trip_EVs <-
-    dplyr::sample_n(source_EVs, trips_source_i, replace = FALSE)
-
-  return(trip_EVs)
-}
 
 
 #' This function returns the gas price for the zip code from the gas price dataframe
@@ -381,20 +387,22 @@ get_Gas_Price <- function(gas_prices, origin_zip) {
 #'
 #' This function creates a dataframe with trip details needed for the VCDM.
 #'
+#' @param main_con The database connection passed to another function
+#' @param a_id The analysis_id
 #' @param gas_prices The dataframe containing gas prices for each zip code
 #' @param trip_EV_row The dataframe containing details about the EV taking the trip
 #' @param trip_sp Dataframe containing trip shortest_path
-#' @param trip_cd Dataframe with trip charging_distances
 #' @param trip_dc Dataframe with trip destination chargers
 #'
 #'
 #' @return The dataframe with EV specific trip details
 #'
 make_trip_row <-
-  function(gas_prices,
+  function(main_con,
+           a_id = 1,
+           gas_prices,
            trip_EV_row,
            trip_sp,
-           trip_cd,
            trip_dc) {
     # Input validation --------------------------------------------------------
 
@@ -406,9 +414,6 @@ make_trip_row <-
     }
     if (!class(trip_sp) == 'data.frame') {
       stop('trip_sp should be of type data.frame')
-    }
-    if (!class(trip_cd) == 'data.frame') {
-      stop('trip_cd should be of type data.frame')
     }
     if (!class(trip_dc) == 'data.frame') {
       stop('trip_dc should be of type data.frame')
@@ -435,40 +440,40 @@ make_trip_row <-
     # Input correction --------------------------------------------------------
 
     # trip_cd is null, then give it path length
-    if (rapportools::is.empty(trip_cd$cd_chademo)) {
-      # lg$fatal(msg = paste("cd_chademo is null"),
-      #          trip_EV_row = trip_EV_row)
-      # In case the dataframe is empty create a new dataframe and add columns
-      # trip_cd <- data.frame()
-      # browser()
-      trip_cd$cd_chademo <- numeric(nrow(trip_cd))
-      trip_cd[1, 'cd_chademo'] <-
-        trip_sp$shortest_path_length[1]
-    }
-    if (rapportools::is.empty(trip_cd$cd_combo)) {
-      # lg$fatal(msg = paste("cd_combo is null"),
-      #          trip_EV_row = trip_EV_row)
-      #  browser()
-      trip_cd$cd_combo <- numeric(nrow(trip_cd))
-      trip_cd[1, 'cd_combo'] <-
-        trip_sp$shortest_path_length[1]
-    }
+    # if (rapportools::is.empty(trip_cd$cd_chademo)) {
+    #   # lg$fatal(msg = paste("cd_chademo is null"),
+    #   #          trip_EV_row = trip_EV_row)
+    #   # In case the dataframe is empty create a new dataframe and add columns
+    #   # trip_cd <- data.frame()
+    #   # browser()
+    #   trip_cd$cd_chademo <- numeric(nrow(trip_cd))
+    #   trip_cd[1, 'cd_chademo'] <-
+    #     trip_sp$shortest_path_length[1]
+    # }
+    # if (rapportools::is.empty(trip_cd$cd_combo)) {
+    #   # lg$fatal(msg = paste("cd_combo is null"),
+    #   #          trip_EV_row = trip_EV_row)
+    #   #  browser()
+    #   trip_cd$cd_combo <- numeric(nrow(trip_cd))
+    #   trip_cd[1, 'cd_combo'] <-
+    #     trip_sp$shortest_path_length[1]
+    # }
 
     # Assignment --------------------------------------------------------------
 
     if (trip_EV_row$connector_code == 1) {
-      max_spacing <- trip_cd$cd_chademo # in miles
+      #      max_spacing <- trip_cd$cd_chademo # in miles
       dest_charger <-
         trip_dc$dc_chademo
     } else if (trip_EV_row$connector_code == 2) {
-      max_spacing <- trip_cd$cd_combo
+      #     max_spacing <- trip_cd$cd_combo
       dest_charger <-
         trip_dc$dc_combo
     } else {
       # Need to replace this with Tesla Superchargers
-      max_spacing <-
-        base::min(trip_cd$cd_chademo ,
-                  trip_cd$cd_combo)
+      # max_spacing <-
+      #   base::min(trip_cd$cd_chademo ,
+      #             trip_cd$cd_combo)
       dest_charger <-
         trip_dc$dc_chademo |
         trip_dc$dc_combo
@@ -484,14 +489,13 @@ make_trip_row <-
     gas_price <-
       get_Gas_Price(gas_prices = gas_prices, origin_zip = trip_EV_row$origin_zip)
 
-    # lg$debug(
-    #     shortest_path_length = trip_sp$shortest_path_length,
-    #     dest_charger_L2 = dest_charger_L2,
-    #     dest_charger = dest_charger,
-    #     max_spacing = max_spacing,
-    #     gas_prices = gas_price,
-    #     msg = "Debugging make_trip_row"
-    # )
+    max_spacing <- get_max_spacing(
+      main_con = main_con,
+      a_id = a_id,
+      origin = trip_EV_row$origin_zip,
+      dest = trip_EV_row$destination_zip,
+      connector_code = trip_EV_row$connector_code
+    )
     trip_row <- data.frame(
       dist = trip_sp$shortest_path_length,
       dest_charger_L2 = dest_charger_L2,
@@ -501,6 +505,83 @@ make_trip_row <-
     )
 
     return(trip_row)
+  }
+
+#' Get max spacing between charging stations
+#'
+#' @param main_con The database connection
+#' @param a_id The analysis_id
+#' @param origin The origin zip code
+#' @param destination The destination zip code
+#' @param connector_code The connector_code for the EV - ChaDEMO or COMBO
+#'
+#' @return max_spacing The maximum spacing (in miles) between charging stations along the shortest path
+#'
+get_max_spacing <-
+  function(main_con,
+           a_id,
+           origin,
+           dest,
+           connector_code) {
+    # Input validation --------------------------------------------------------
+
+    if (!(class(origin) == 'integer' ||
+          class(origin) == 'numeric')) {
+      stop('origin should be of type integer or numeric')
+    }
+    if (!(class(dest) == 'integer' || class(dest) == 'numeric')) {
+      stop('destination should be of type integer or numeric')
+    }
+    if (!is.element(connector_code, c(1, 2, 4))) {
+      stop('connector_code should be either 1, 2 or 4')
+    }
+
+    # For non-tesla vehicles
+    if (connector_code != 4) {
+      query_msp <-
+        glue::glue(
+          "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing  from (
+select sq2.ratio - lag(sq2.ratio) over (order by sq2.ratio) as delr, line from
+(select ST_LineLocatePoint(line, sq.points) as ratio, line from
+sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now{a_id} where connector_code = {connector_code} or connector_code = 3) as sq
+where st_dwithin(line::geography, sq.points::geography, 16093.4)
+order by ratio asc) as sq2) as sq3
+group by sq3.line;"
+        )
+    } else {
+      # all chargers are game, the where clause vanishes in the evses_now table
+      query_msp <-
+        glue::glue(
+          "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing  from (
+select sq2.ratio - lag(sq2.ratio) over (order by sq2.ratio) as delr, line from
+(select ST_LineLocatePoint(line, sq.points) as ratio, line from
+sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now{a_id}) as sq
+where st_dwithin(line::geography, sq.points::geography, 16093.4)
+order by ratio asc) as sq2) as sq3
+group by sq3.line;"
+        )
+    }
+
+    max_spc_df <- DBI::dbGetQuery(main_con, query_msp)
+
+    if (rapportools::is.empty(max_spc_df$max_spacing)) {
+      # there were no charging stations in vicinity of the road
+      # so the max spacing is the length of the shortest path
+      query_sp <-
+        glue::glue(
+          "select (st_length(line::geography) * 0.000621371) as splen from (
+select sp_od2({origin}, {dest}) as line ) as sq"
+        )
+
+      spl_df <- DBI::dbGetQuery(main_con, query_sp)
+      max_spacing <- spl_df$splen
+
+    } else {
+      max_spacing <- max_spc_df$max_spacing
+    }
+
+    return(max_spacing)
+
   }
 
 #' Make EVSES_NOW table
@@ -521,7 +602,6 @@ make_trip_row <-
 #' @importFrom rlang .data
 #'
 make_evses_now_table <- function(main_con, a_id = 1) {
-
   # Get all new EVSEs for the said analysis_id where we have some fast charger
   query_nevses <-
     paste0("select * from new_evses where dcfc_plug_count > 0 and analysis_id = ",
@@ -683,7 +763,8 @@ trip_gen <- function(num_days = 1,
       )
     )$include_tesla
 
-  evses_now <- make_evses_now_table(a_id = a_id, main_con = main_con)
+  evses_now <-
+    make_evses_now_table(a_id = a_id, main_con = main_con)
 
   # Check table data -------------------------
 
@@ -696,7 +777,7 @@ trip_gen <- function(num_days = 1,
       (exists("od_sp")) &&
       (nrow(od_sp) > 0) &&
       (exists("dest_charger")) && (nrow(dest_charger) > 0) &&
-      (exists("evses_now")) && (nrow(evses_now) > 0) ) {
+      (exists("evses_now")) && (nrow(evses_now) > 0)) {
     lg$log(level = "info",
            msg = "Data tables seem exist and well-populated",
            "ip" = ipify::get_ip())
@@ -822,12 +903,13 @@ trip_gen <- function(num_days = 1,
 
       # If EVs are available in this zip code
       if (nrow(source_EVs) > 0) {
-
         # 8. Get trips EVs from source EVs ------------------
         trip_EVs <-
-          get_tripEVs_from_sourceEVs(trips_source_i = trips_source_i,
-                                     source_EVs = source_EVs,
-                                     config = config)
+          get_tripEVs_from_sourceEVs(
+            trips_source_i = trips_source_i,
+            source_EVs = source_EVs,
+            config = config
+          )
         # print("Generated a list of EVs for the days trips - now separate into return and departure")
 
         if (dim(trip_EVs)[1] == 0) {
@@ -846,7 +928,7 @@ trip_gen <- function(num_days = 1,
         if (EV_req_tots$returning_trips[i] > 0) {
           returning_counter <- 1
           nz_return_source <-
-            nz_return[nz_return$destination == EV_req_tots$source[i], ]
+            nz_return[nz_return$destination == EV_req_tots$source[i],]
           j <- 1
           for (j in 1:nrow(nz_return_source)) {
             # Find the number of trips between the OD pair
@@ -909,9 +991,10 @@ trip_gen <- function(num_days = 1,
                   trip_EVs_returning_g$veh_id[ii]
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_returning_row <-
-                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj], ]
+                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj],]
 
                 if (dim(trip_EV_returning_row)[1] == 0) {
+
                 }
                 origin_zip <-
                   trip_EV_returning_row$origin_zip
@@ -921,10 +1004,10 @@ trip_gen <- function(num_days = 1,
                 trip_sp_ret <-
                   od_sp %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
-                browser()
-                trip_cd_ret <-
-                  od_cd %>% dplyr::filter(.data$origin == origin_zip,
-                                          .data$destination == destination_zip)
+                # browser()
+                # trip_cd_ret <-
+                #   od_cd %>% dplyr::filter(.data$origin == origin_zip,
+                #                           .data$destination == destination_zip)
                 trip_dc_ret <-
                   dest_charger %>% dplyr::filter(.data$zip == destination_zip)
                 # Find the distance for the OD pair
@@ -942,11 +1025,13 @@ trip_gen <- function(num_days = 1,
                   dst <- det_updated
                 }
                 trip_start_time <-
-                  rnd_date_time(1,
-                                st = dst,
-                                et = det_updated,
-                                tz = "America/Los_Angeles",
-                                config = config)
+                  rnd_date_time(
+                    1,
+                    st = dst,
+                    et = det_updated,
+                    tz = "America/Los_Angeles",
+                    config = config
+                  )
                 # print(as.character(trip_start_time))
 
                 trip_EV_returning_row$trip_start_time <-
@@ -960,10 +1045,11 @@ trip_gen <- function(num_days = 1,
 
                 returning_trip_row <-
                   make_trip_row(
+                    a_id = a_id,
+                    main_con = main_con,
                     gas_prices =  wa_gas_prices,
                     trip_EV_row = trip_EV_returning_row,
                     trip_sp = trip_sp_ret,
-                    trip_cd = trip_cd_ret,
                     trip_dc = trip_dc_ret
                   )
 
@@ -975,6 +1061,8 @@ trip_gen <- function(num_days = 1,
                   )
 
                 # print(prob_ij)
+
+                set.seed(config[['GLOBAL_SEED']])
                 # Make a random draw based on this probability
                 ret_vehicle_choice <-
                   stats::rbinom(1, 1, prob_ij_bev)
@@ -1019,7 +1107,7 @@ trip_gen <- function(num_days = 1,
         if (EV_req_tots$departing_trips[i] > 0) {
           departing_counter <- 1
           nz_departure_source <-
-            nz_departure[nz_departure$origin == EV_req_tots$source[i], ]
+            nz_departure[nz_departure$origin == EV_req_tots$source[i],]
           for (j in 1:nrow(nz_departure_source)) {
             # Find the number of trips between the OD pair
             trip_count_OD <-
@@ -1089,7 +1177,7 @@ trip_gen <- function(num_days = 1,
 
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_departing_row <-
-                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj], ]
+                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj],]
 
                 if (dim(trip_EV_departing_row)[1] == 0) {
                   browser()
@@ -1102,9 +1190,9 @@ trip_gen <- function(num_days = 1,
                 trip_sp_dep <-
                   od_sp %>% dplyr::filter(.data$origin == origin_zip,
                                           .data$destination == destination_zip)
-                trip_cd_dep <-
-                  od_cd %>% dplyr::filter(.data$origin == origin_zip,
-                                          .data$destination == destination_zip)
+                # trip_cd_dep <-
+                #   od_cd %>% dplyr::filter(.data$origin == origin_zip,
+                #                           .data$destination == destination_zip)
                 trip_dc_dep <-
                   dest_charger %>% dplyr::filter(.data$zip == destination_zip)
                 # Find the distance for the OD pair
@@ -1121,11 +1209,13 @@ trip_gen <- function(num_days = 1,
                   dst <- det_updated
                 }
                 trip_start_time <-
-                  rnd_date_time(1,
-                                st = dst,
-                                et = det_updated,
-                                tz = "America/Los_Angeles",
-                                config = config)
+                  rnd_date_time(
+                    1,
+                    st = dst,
+                    et = det_updated,
+                    tz = "America/Los_Angeles",
+                    config = config
+                  )
                 trip_EV_departing_row$trip_start_time <-
                   as.character(trip_start_time)
 
@@ -1136,10 +1226,11 @@ trip_gen <- function(num_days = 1,
 
                 departing_trip_row <-
                   make_trip_row(
+                    a_id = a_id,
+                    main_con = main_con,
                     gas_prices =  wa_gas_prices,
                     trip_EV_row = trip_EV_departing_row,
                     trip_sp = trip_sp_dep,
-                    trip_cd = trip_cd_dep,
                     trip_dc = trip_dc_dep
                   )
 
@@ -1151,6 +1242,9 @@ trip_gen <- function(num_days = 1,
                   )
 
                 # print(prob_ij)
+
+                set.seed(config[['GLOBAL_SEED']])
+
                 dep_vehicle_choice <-
                   stats::rbinom(1, 1, prob_ij_bev)
 
@@ -1209,6 +1303,7 @@ trip_gen <- function(num_days = 1,
     }
   }
 
+  DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
   DBI::dbDisconnect(main_con)
 }
 

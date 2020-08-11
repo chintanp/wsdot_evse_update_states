@@ -9,7 +9,8 @@ rnd_date_time(
   N,
   st = "2019/07/01",
   et = "2019/07/02",
-  tz = "America/Los_Angeles"
+  tz = "America/Los_Angeles",
+  config
 )
 }
 \arguments{
@@ -19,7 +20,9 @@ rnd_date_time(
 
 \item{et}{End date in the format "yyyy/mm/dd"}
 
-\item{tz}{Tiemzone for the dates}
+\item{tz}{Timezone for the dates}
+
+\item{config}{constants}
 }
 \value{
 The randomly generated date time.

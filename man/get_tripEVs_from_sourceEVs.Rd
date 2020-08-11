@@ -4,7 +4,7 @@
 \alias{get_tripEVs_from_sourceEVs}
 \title{Get the trips EVs from the relevant EVs belonging to a source zip code}
 \usage{
-get_tripEVs_from_sourceEVs(trips_source_i, source_EVs)
+get_tripEVs_from_sourceEVs(trips_source_i, source_EVs, config)
 }
 \arguments{
 \item{trips_source_i}{Number of trips from a source zip code}

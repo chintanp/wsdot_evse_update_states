@@ -27,6 +27,7 @@ Imports:
     rlang,
     config,
     foreach, 
-    here
+    here, 
+    glue
 RoxygenNote: 7.1.1
 StagedInstall: no
