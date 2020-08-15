@@ -1302,7 +1302,8 @@ trip_gen <- function(num_days = 1,
 
     }
   }
-
+  query_status <- glue::glue("update analysis_record set status = 'trips_generated' where analysis_id = {a_id}")
+  DBI::dbGetQuery(main_con, query_status)
   DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
   DBI::dbDisconnect(main_con)
 }

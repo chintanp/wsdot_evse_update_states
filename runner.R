@@ -10,5 +10,6 @@ update_states_and_gen_trips <- function(a_id = 1) {
            a_id = a_id)
 }
 
-update_states_and_gen_trips(1)
+a_id <-  read.table("analysis_id", header = F)[1, 1]
+update_states_and_gen_trips(a_id)
 
