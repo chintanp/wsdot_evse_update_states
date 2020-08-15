@@ -879,7 +879,13 @@ trip_gen <- function(num_days = 1,
       )
 
     lg$log(
-      level = "debug",
+      level = "info",
+      msg = paste0("Departure trips calculated, count: ", nrow(nz_departure)),
+      "ip" = ipify::get_ip()
+    )
+
+    lg$log(
+      level = "info",
       msg = paste("EV_req_tots with rows: ", nrow(EV_req_tots)),
       "EV_req_tots" = EV_req_tots,
       "ip" = ipify::get_ip()
@@ -1068,7 +1074,7 @@ trip_gen <- function(num_days = 1,
                   stats::rbinom(1, 1, prob_ij_bev)
 
                 lg$log(
-                  level = "debug",
+                  level = "info",
                   msg = "Calculating returning trip vehicle choice",
                   "ev_range" = trip_EV_returning_row$range_fe,
                   "trip_row" = returning_trip_row,
@@ -1249,7 +1255,7 @@ trip_gen <- function(num_days = 1,
                   stats::rbinom(1, 1, prob_ij_bev)
 
                 lg$log(
-                  level = "debug",
+                  level = "info",
                   "ev_range" = trip_EV_departing_row$range_fe,
                   "trip_row" = departing_trip_row,
                   "prob_ij_bev" = prob_ij_bev,
