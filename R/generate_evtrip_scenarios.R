@@ -883,7 +883,7 @@ trip_gen <- function(num_days = 1,
       msg = paste0("Departure trips calculated, count: ", nrow(nz_departure)),
       "ip" = ipify::get_ip()
     )
-    browser()
+    # browser()
     lg$log(
       level = "info",
       msg = paste("EV_req_tots with rows: ", nrow(EV_req_tots)),
