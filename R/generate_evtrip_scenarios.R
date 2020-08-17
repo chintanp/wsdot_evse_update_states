@@ -14,6 +14,8 @@
 #' @param tz Timezone for the dates
 #' @param config constants
 #'
+#' @export
+#'
 #' @return The randomly generated date time.
 #'
 rnd_date_time <-
@@ -44,6 +46,8 @@ rnd_date_time <-
 #'                       max_spacing - Maximum gap between DCFC chargers along the shortest path for the trip
 #'                       gas_price - Price of gas at the origin zip code of the trip
 #' @param config constants
+#'
+#' @export
 #'
 #' @return The probability of travel by EV
 
@@ -124,6 +128,8 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
 #'
 #' @return A dataframe with column origin, destination, and
 #' number of trips between the origin and destination
+#'
+#' @export
 #'
 #' @import magrittr
 #' @importFrom rlang .data
@@ -229,6 +235,8 @@ create_return_df <- function(od, od_sp, config) {
 #' @return A dataframe with column origin, destination, and
 #' number of trips between the origin and destination
 #'
+#' @export
+#'
 #' @import magrittr
 #' @importFrom rlang .data
 #'
@@ -316,6 +324,8 @@ create_departure_df <- function(od, od_sp, config) {
 #'@param trips_source_i Number of trips from a source zip code
 #'@param source_EVs the dataframe of EVs from the zip code
 #'
+#' @export
+#'
 #'@return The selected trip EVs from the set of EVs at source
 #'
 get_tripEVs_from_sourceEVs <-
@@ -356,6 +366,8 @@ get_tripEVs_from_sourceEVs <-
 #' @param gas_prices The dataframe containing gas price for each zip code
 #' @param origin_zip The zip for which gas price is to be known
 #'
+#' @export
+#'
 #' @return The gas price for the relevant zip code
 #'
 get_Gas_Price <- function(gas_prices, origin_zip) {
@@ -394,6 +406,7 @@ get_Gas_Price <- function(gas_prices, origin_zip) {
 #' @param trip_sp Dataframe containing trip shortest_path
 #' @param trip_dc Dataframe with trip destination chargers
 #'
+#' @export
 #'
 #' @return The dataframe with EV specific trip details
 #'
@@ -514,6 +527,8 @@ make_trip_row <-
 #' @param origin The origin zip code
 #' @param destination The destination zip code
 #' @param connector_code The connector_code for the EV - ChaDEMO or COMBO
+#'
+#' @export
 #'
 #' @return max_spacing The maximum spacing (in miles) between charging stations along the shortest path
 #'
@@ -1080,6 +1095,9 @@ trip_gen <- function(num_days = 1,
                   "trip_row" = returning_trip_row,
                   "prob_ij_bev" = prob_ij_bev,
                   "ret_vehicle_choice" = ret_vehicle_choice,
+                  "origin_zip" = origin_zip,
+                  "destination_zip" = destination_zip,
+                  "veh_id" = EV_id,
                   "ip" = ipify::get_ip()
                 )
 
@@ -1260,6 +1278,9 @@ trip_gen <- function(num_days = 1,
                   "trip_row" = departing_trip_row,
                   "prob_ij_bev" = prob_ij_bev,
                   "dep_vehicle_choice" = dep_vehicle_choice,
+                  "origin_zip" = origin_zip,
+                  "destination_zip" = destination_zip,
+                  "veh_id" = EV_id,
                   "ip" = ipify::get_ip(),
                   msg = "Calculating departing trip vehicle choice"
                 )
