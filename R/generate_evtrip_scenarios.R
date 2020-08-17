@@ -556,7 +556,7 @@ get_max_spacing <-
       query_msp <-
         glue::glue(
           "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing  from (
-select sq2.ratio - lag(sq2.ratio) over (order by sq2.ratio) as delr, line from
+select sq2.ratio - coalesce((lag(sq2.ratio) over (order by sq2.ratio)), 0) as delr, line from
 (select ST_LineLocatePoint(line, sq.points) as ratio, line from
 sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now{a_id} where connector_code = {connector_code} or connector_code = 3) as sq
 where st_dwithin(line::geography, sq.points::geography, 16093.4)
@@ -568,7 +568,7 @@ group by sq3.line;"
       query_msp <-
         glue::glue(
           "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing  from (
-select sq2.ratio - lag(sq2.ratio) over (order by sq2.ratio) as delr, line from
+select sq2.ratio - coalesce((lag(sq2.ratio) over (order by sq2.ratio)), 0) as delr, line from
 (select ST_LineLocatePoint(line, sq.points) as ratio, line from
 sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now{a_id}) as sq
 where st_dwithin(line::geography, sq.points::geography, 16093.4)
