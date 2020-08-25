@@ -31,3 +31,5 @@ Imports:
     glue
 RoxygenNote: 7.1.1
 StagedInstall: no
+Depends: 
+    R (>= 2.10)

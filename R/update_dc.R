@@ -15,7 +15,7 @@ update_dc <- function(a_id = 1) {
 
   # Initialization ------------------
 
-  source("./R/setup_logging.R")
+  devtools::load_all("./R/setup_logging.R")
   ## Setup the logging destination
   lg <-
     lgr::get_logger("test")$set_propagate(FALSE)$set_appenders(lgr::AppenderJson$new(layout = LayoutLogstash$new(), file = here::here(
