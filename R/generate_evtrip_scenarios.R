@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 #' Generate random date times between two date-times, for a timezone
 #' Adapted from : https://stackoverflow.com/a/14721124/1328232
 #'
@@ -1329,7 +1322,12 @@ trip_gen <- function(num_days = 1,
 
     }
   }
-  query_status <- glue::glue("update analysis_record set status = 'trips_generated' where analysis_id = {a_id}")
+  tst_df <- DBI::dbGetQuery(main_con, glue::glue("select trip_start_time from
+  evtrip_scenarios where analysis_id = {a_id}
+  order by trip_start_time::timestamp
+  limit 1;"))
+
+  query_status <- glue::glue("update analysis_record set sim_start_time = '{tst_df$trip_start_time}' and status = 'trips_generated' where analysis_id = {a_id}")
   DBI::dbGetQuery(main_con, query_status)
   DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
   DBI::dbDisconnect(main_con)

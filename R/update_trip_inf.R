@@ -42,7 +42,7 @@ update_trip_inf <- function () {
   for (row in 1:nrow(all_trips)) {
     insert_query <-
       glue::glue(
-        'insert into trip_infeasibility (trip_count, od_pairs, length, geom)
+        'insert into trip_infeasibility2 (trip_count, od_pairs, length, geom)
     (select at1.ccounts,
             at1.origin::text || at1.destination::text,
             spacings,
@@ -62,7 +62,7 @@ update_trip_inf <- function () {
 
                    (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points
                     from built_evse
-                    where connector_code = 1
+                    where connector_code = 2
                         or connector_code = 3) as sq
                where st_dwithin(line::geography, sq.points::geography, 16093.4)
                union select 1.0,
@@ -73,8 +73,8 @@ update_trip_inf <- function () {
              ({all_trips$ObjectID[row]})
          AND spacings > 70) on conflict (md5(geom::TEXT)) do
 update
-set trip_count = trip_infeasibility.trip_count + EXCLUDED.trip_count,
-    od_pairs = trip_infeasibility.od_pairs || ', " ', '",
+set trip_count = trip_infeasibility2.trip_count + EXCLUDED.trip_count,
+    od_pairs = trip_infeasibility2.od_pairs || ', " ', '",
         ' || EXCLUDED.od_pairs;'
       )
     # print(insert_query)
