@@ -22,7 +22,12 @@ RUN Rscript -e 'remotes::install_version("dplyr",upgrade="never", version = "1.0
 RUN Rscript -e 'remotes::install_version("rapportools",upgrade="never", version = "1.0")'
 RUN Rscript -e 'remotes::install_version("data.table",upgrade="never", version = "1.13.0")'
 RUN Rscript -e 'remotes::install_version("devtools",upgrade="never", version = "2.3.1")'
+RUN Rscript -e 'remotes::install_version("readr",upgrade="never", version = "1.3.1")'
+RUN Rscript -e 'remotes::install_version("ipify",upgrade="never", version = "0.2.0")'
+RUN Rscript -e 'remotes::install_version("tidyr",upgrade="never", version = "1.1.2")'
+RUN Rscript -e 'remotes::install_version("RSocrata",upgrade="never", version = "1.7.10-6")'
 RUN mkdir /build_zone
+RUN mkdir /build_zone/logs
 ADD . /build_zone
 WORKDIR /build_zone
 RUN R -e 'remotes::install_local(upgrade="never")'

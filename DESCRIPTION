@@ -30,7 +30,11 @@ Imports:
     here, 
     glue, 
     httr, 
-    devtools
+    devtools, 
+    readr, 
+    tidyr,
+    ipify,
+    RSocrata
 RoxygenNote: 7.1.1
 StagedInstall: no
 Depends: 
