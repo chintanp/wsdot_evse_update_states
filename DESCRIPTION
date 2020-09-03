@@ -29,7 +29,8 @@ Imports:
     foreach, 
     here, 
     glue, 
-    httr
+    httr, 
+    devtools
 RoxygenNote: 7.1.1
 StagedInstall: no
 Depends: 

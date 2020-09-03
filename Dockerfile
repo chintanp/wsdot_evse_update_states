@@ -21,6 +21,7 @@ RUN Rscript -e 'remotes::install_version("RPostgres",upgrade="never", version = 
 RUN Rscript -e 'remotes::install_version("dplyr",upgrade="never", version = "1.0.2")'
 RUN Rscript -e 'remotes::install_version("rapportools",upgrade="never", version = "1.0")'
 RUN Rscript -e 'remotes::install_version("data.table",upgrade="never", version = "1.13.0")'
+RUN Rscript -e 'remotes::install_version("devtools",upgrade="never", version = "2.3.1")'
 RUN mkdir /build_zone
 ADD . /build_zone
 WORKDIR /build_zone
