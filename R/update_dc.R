@@ -85,7 +85,20 @@ update_dc <- function(a_id = 1) {
         idwithin$analysis_id <- a_id
         # Once dc_chademo and dc_combo are updated, st_dwithin column can be deleted
         idwithin$st_dwithin <- NULL
-        DBI::dbAppendTable(main_con, "dest_charger", idwithin, append = TRUE)
+        # DBI::dbAppendTable(main_con, "dest_charger", idwithin, append = TRUE)
+
+        for(i in 1:nrow(idwithin)) {
+
+        insert_query <- glue::glue("insert into dest_charger (analysis_id, zip, dc_chademo, dc_combo, dc_level2)
+values ({idwithin$analysis_id[i]}, {idwithin$zip[i]}, '{idwithin$dc_chademo[i]}', '{idwithin$dc_combo[i]}', '{idwithin$dc_level2[i]}')
+on conflict (analysis_id, zip) do update set
+dc_chademo = dest_charger.dc_chademo OR EXCLUDED.dc_chademo,
+dc_combo = dest_charger.dc_combo OR EXCLUDED.dc_combo,
+dc_level2 = dest_charger.dc_level2 OR EXCLUDED.dc_level2;")
+        print(insert_query)
+        DBI::dbExecute(main_con, insert_query)
+        DBI::dbReadTable(main_con, "dest_charger")
+        }
       }
     }
   }

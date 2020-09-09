@@ -1327,7 +1327,7 @@ trip_gen <- function(num_days = 1,
   order by trip_start_time::timestamp
   limit 1;"))
 
-  query_status <- glue::glue("update analysis_record set sim_start_time = '{tst_df$trip_start_time}' and status = 'trips_generated' where analysis_id = {a_id}")
+  query_status <- glue::glue("update analysis_record set sim_start_time = '{tst_df$trip_start_time}', status = 'trips_generated' where analysis_id = {a_id}")
   DBI::dbGetQuery(main_con, query_status)
   DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
   DBI::dbDisconnect(main_con)

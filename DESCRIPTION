@@ -28,7 +28,8 @@ Imports:
     config,
     foreach, 
     here, 
-    glue
+    glue, 
+    httr
 RoxygenNote: 7.1.1
 StagedInstall: no
 Depends: 
