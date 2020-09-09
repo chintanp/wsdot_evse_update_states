@@ -29,7 +29,16 @@ Imports:
     foreach, 
     here, 
     glue, 
+<<<<<<< HEAD
     httr
+=======
+    httr, 
+    devtools, 
+    readr, 
+    tidyr,
+    ipify,
+    RSocrata
+>>>>>>> 858fc8956ff884e9b6a1c321efd2c3a2f665d661
 RoxygenNote: 7.1.1
 StagedInstall: no
 Depends: 
