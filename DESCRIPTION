@@ -29,7 +29,7 @@ Imports:
     foreach, 
     here, 
     glue, 
-    httr
+    httr,
     devtools, 
     readr, 
     tidyr,

@@ -811,7 +811,7 @@ trip_gen <- function(num_days = 1,
     wa_evtrips <-
       wa_evtrips %>% dplyr::rename(oevs = oevs_no_tesla, devs = devs_no_tesla)
     wa_bevs <-
-      wa_bevs %>% dplyr::filter(!(make == 'Tesla')) # ~ 16000
+      wa_bevs %>% dplyr::filter(!grepl("tesla", make, ignore.case = TRUE)) # ~ 16000
   }
 
   # 1. Calculate trip generation rate -----------
