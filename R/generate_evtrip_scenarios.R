@@ -548,12 +548,30 @@ get_max_spacing <-
     if (connector_code != 4) {
       query_msp <-
         glue::glue(
-          "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing  from (
-select sq2.ratio - coalesce((lag(sq2.ratio) over (order by sq2.ratio)), 0) as delr, line from
-(select ST_LineLocatePoint(line, sq.points) as ratio, line from
-sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now{a_id} where connector_code = {connector_code} or connector_code = 3) as sq
-where st_dwithin(line::geography, sq.points::geography, 16093.4)
-order by ratio asc) as sq2) as sq3
+          "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing
+from
+    (select sq2.ratio - coalesce((lag(sq2.ratio) over (
+                                                       order by sq2.ratio)), 0) as delr,
+            line
+     from
+         (select ST_LineLocatePoint(line, sqa.points) as ratio,
+                 line
+          from sp_od2({origin}, {dest}) as line,
+
+              (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points
+               from
+                   (select longitude,
+                           latitude
+                    from evses_now{a_id}
+                    where connector_code = {connector_code}
+                        or connector_code = 3
+                    union select longitude,
+                                 latitude
+                    from zipcode_record
+                    where zip = '{origin}'
+                        or zip = '{dest}') as sq) as sqa
+          where st_dwithin(line::geography, sqa.points::geography, 16093.4)
+          order by ratio asc) as sq2) as sq3
 group by sq3.line;"
         )
     } else {
