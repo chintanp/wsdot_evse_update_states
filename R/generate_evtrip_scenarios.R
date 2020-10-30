@@ -165,10 +165,11 @@ create_return_df <- function(od, od_sp, config) {
   }
   if (!(class(config[['CRITICAL_DISTANCE']]) == 'numeric' ||
         class(config[['CRITICAL_DISTANCE']]) == 'integer')) {
-    stop('`CRITICAL_DISTANCE` should be of class numeric')
+    stop('`CRITICAL_DISTANCE` should be of class numeric or integer')
   }
-  if (!class(config[['GLOBAL_SEED']]) == 'integer') {
-    stop('`GLOBAL_SEED` should be of class numeric')
+  if (!(class(config[['GLOBAL_SEED']]) == 'numeric' ||
+      config[['GLOBAL_SEED']] == 'integer')) {
+    stop('`GLOBAL_SEED` should be of class numeric or integer')
   }
   if (config[['CRITICAL_DISTANCE']] < 0) {
     stop('`CRITICAL_DISTANCE` should be a positive number')
