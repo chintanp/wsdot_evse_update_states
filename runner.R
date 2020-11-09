@@ -53,7 +53,7 @@ where ap.analysis_id = {a_id};"))
   config[['AVG_RESTROOM_SPACING']] <- as.numeric(analysis_params$param_value[analysis_params$param_name == 'avg_restroom_spacing_miles'])
   config[['LOOKUP_DISTANCE']] <- as.numeric(analysis_params$param_value[analysis_params$param_name == 'lookup_distance_miles'])
 
-  browser()
+  # browser()
 
   tripgen::update_dc(a_id)
 

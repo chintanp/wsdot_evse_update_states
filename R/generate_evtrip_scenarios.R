@@ -72,7 +72,7 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
   if (ev_range <= 0) {
     stop('ev_range should be a positive value')
   }
-
+  # browser()
   # VCDM Parameters ---------------------------------------------------------
 
   theta_1 <- -0.04
@@ -168,7 +168,7 @@ create_return_df <- function(od, od_sp, config) {
     stop('`CRITICAL_DISTANCE` should be of class numeric or integer')
   }
   if (!(class(config[['GLOBAL_SEED']]) == 'numeric' ||
-      config[['GLOBAL_SEED']] == 'integer')) {
+        config[['GLOBAL_SEED']] == 'integer')) {
     stop('`GLOBAL_SEED` should be of class numeric or integer')
   }
   if (config[['CRITICAL_DISTANCE']] < 0) {
@@ -648,7 +648,9 @@ make_evses_now_table <- function(main_con, a_id = 1) {
                "latitude",
                "connector_code",
                "dcfc_count")] %>%
-    dplyr::filter(.data$dcfc_count >= 1)
+    dplyr::filter(.data$dcfc_count >= 1) %>%
+    dplyr::filter(.data$connector_code == 1 |
+                    .data$connector_code == 2 | .data$connector_code == 3)
 
   bevses$dcfc_count <- NULL
 
@@ -669,7 +671,7 @@ make_evses_now_table <- function(main_con, a_id = 1) {
   evses_now <- rbind(evses_now, nevses)
 
   # Create a table with total evses
-  DBI::dbWriteTable(main_con, paste0("evses_now", a_id), evses_now, overwrite = FALSE)
+  DBI::dbWriteTable(main_con, paste0("evses_now", a_id), evses_now, overwrite = TRUE)
   # Make a unique table for each analysis_id and drop it after the analysis is complete
 
   return(evses_now)
@@ -961,7 +963,7 @@ trip_gen <- function(num_days = 1,
         if (EV_req_tots$returning_trips[i] > 0) {
           returning_counter <- 1
           nz_return_source <-
-            nz_return[nz_return$destination == EV_req_tots$source[i],]
+            nz_return[nz_return$destination == EV_req_tots$source[i], ]
           j <- 1
           for (j in 1:nrow(nz_return_source)) {
             # Find the number of trips between the OD pair
@@ -1024,7 +1026,7 @@ trip_gen <- function(num_days = 1,
                   trip_EVs_returning_g$veh_id[ii]
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_returning_row <-
-                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj],]
+                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj], ]
 
                 if (dim(trip_EV_returning_row)[1] == 0) {
 
@@ -1143,7 +1145,7 @@ trip_gen <- function(num_days = 1,
         if (EV_req_tots$departing_trips[i] > 0) {
           departing_counter <- 1
           nz_departure_source <-
-            nz_departure[nz_departure$origin == EV_req_tots$source[i],]
+            nz_departure[nz_departure$origin == EV_req_tots$source[i], ]
           for (j in 1:nrow(nz_departure_source)) {
             # Find the number of trips between the OD pair
             trip_count_OD <-
@@ -1213,10 +1215,10 @@ trip_gen <- function(num_days = 1,
 
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_departing_row <-
-                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj],]
+                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj], ]
 
                 if (dim(trip_EV_departing_row)[1] == 0) {
-                  browser()
+                  # browser()
                 }
                 origin_zip <-
                   trip_EV_departing_row$origin_zip
@@ -1341,12 +1343,21 @@ trip_gen <- function(num_days = 1,
 
     }
   }
-  tst_df <- DBI::dbGetQuery(main_con, glue::glue("select trip_start_time from
+  tst_df <-
+    DBI::dbGetQuery(
+      main_con,
+      glue::glue(
+        "select trip_start_time from
   evtrip_scenarios where analysis_id = {a_id}
   order by trip_start_time::timestamp
-  limit 1;"))
+  limit 1;"
+      )
+    )
 
-  query_status <- glue::glue("update analysis_record set sim_start_time = '{tst_df$trip_start_time}', status = 'trips_generated' where analysis_id = {a_id}")
+  query_status <-
+    glue::glue(
+      "update analysis_record set sim_start_time = '{tst_df$trip_start_time}', status = 'trips_generated' where analysis_id = {a_id}"
+    )
   DBI::dbGetQuery(main_con, query_status)
   DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
   DBI::dbDisconnect(main_con)
