@@ -85,7 +85,8 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
   theta_8 <- -0.748
   theta_9 <-  1.428 # (destination_charger Level_3)
   ASC_BEV <- 11.184
-
+  ev_range <- ev_range * config$SOC_LOWER_LIMIT / 100 # This is as some EVs can start with the lower SOC value
+  # Ideally change the above to min(SOC_LOWER_LIMIT, MAX_SOC) as after fast charge the vehicle may only go up-to 80% (MAX_SOC)
 
   # Probability calculation ------------------------------------------------
 
@@ -778,7 +779,7 @@ from wa_evtrips wae
                    on wabost.zip_code = wae.origin
          left join (select count(veh_id), zip_code from wa_bevs where lower(make) <> 'tesla' group by zip_code) wabdst
                    on wabdst.zip_code = wae.destination;")
-
+  # browser()
   od_sp <-
     DBI::dbGetQuery(main_con, 'select * from od_sp')
 
