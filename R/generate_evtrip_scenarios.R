@@ -759,7 +759,25 @@ trip_gen <- function(num_days = 1,
 
   # These are the results of the EV trips generation from PJ
   wa_evtrips <-
-    DBI::dbGetQuery(main_con, 'select * from wa_evtrips')
+    DBI::dbGetQuery(main_con, "select wae.origin,
+       wae.destination,
+       wae.ocars,
+       wae.dcars,
+       wae.ret,
+       wae.dep,
+       coalesce(wabo.count, 0)   as oevs,
+       coalesce(wabd.count, 0)   as devs,
+       coalesce(wabost.count, 0) as oevs_no_tesla,
+       coalesce(wabdst.count, 0) as devs_no_tesla
+from wa_evtrips wae
+         left join (select count(veh_id), zip_code from wa_bevs group by zip_code) wabo
+                   on wabo.zip_code = wae.origin
+         left join (select count(veh_id), zip_code from wa_bevs group by zip_code) wabd
+                   on wabd.zip_code = wae.destination
+         left join (select count(veh_id), zip_code from wa_bevs where lower(make) <> 'tesla' group by zip_code) wabost
+                   on wabost.zip_code = wae.origin
+         left join (select count(veh_id), zip_code from wa_bevs where lower(make) <> 'tesla' group by zip_code) wabdst
+                   on wabdst.zip_code = wae.destination;")
 
   od_sp <-
     DBI::dbGetQuery(main_con, 'select * from od_sp')
