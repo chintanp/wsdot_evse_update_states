@@ -1,7 +1,7 @@
 Package: tripgen
 Type: Package
 Title: This Package Generates the EV Trips Per Day For the State of WA 
-Version: 0.1.0
+Version: 0.1.1
 Author: Chintan Pathak (cp84@uw.edu)
 Maintainer: Chintan Pathak <chintan.pathak@gmail.com>
 Description: This package takes the long distance travel demand model and from long distance passenger trips, finds the long distance EV trips for any given day.

@@ -82,3 +82,68 @@ set trip_count = trip_infeasibility2.trip_count + EXCLUDED.trip_count,
   }
 
 }
+
+
+#' Updates the trip infeasibility map
+#'
+#'
+#'
+#' @export
+#'
+#' @import magrittr
+#' @importFrom utils data
+#' @importFrom rlang .data
+#'
+
+update_trip_map <- function () {
+  # Database settings -------------------------------------------------------
+
+  if (!DBI::dbCanConnect(
+    RPostgres::Postgres(),
+    host = Sys.getenv("MAIN_HOST"),
+    dbname = Sys.getenv("MAIN_DB"),
+    user = Sys.getenv("MAIN_USER"),
+    password = Sys.getenv("MAIN_PWD"),
+    port = Sys.getenv("MAIN_PORT")
+  )) {
+    lg$log(level = "fatal",
+           msg = "Cannot connect to database",
+           "ip" = ipify::get_ip())
+    # Exit if DB cannot connect
+    stop("Cannot connect to database")
+  }
+
+  main_con <- DBI::dbConnect(
+    RPostgres::Postgres(),
+    host = Sys.getenv("MAIN_HOST"),
+    dbname = Sys.getenv("MAIN_DB"),
+    user = Sys.getenv("MAIN_USER"),
+    password = Sys.getenv("MAIN_PWD"),
+    port = Sys.getenv("MAIN_PORT")
+  )
+
+  all_trips <- DBI::dbGetQuery(main_con, "select * from all_trips_count_full")
+
+
+  for (row in 1:nrow(all_trips)) {
+    insert_query <-
+      glue::glue(
+        'insert into trip_map (trip_count, od_pairs, geom, length)
+    (select at1.ccounts,
+            at1.origin::text || at1.destination::text,
+            sq1.line,
+            st_length(sq1.line::geography) * 0.000621371
+     from all_trips_count_full at1
+              CROSS JOIN LATERAL
+              (select sp_od2(at1.origin::int, at1.destination::int) as line) as sq1
+     where at1."ObjectID" IN
+           ({all_trips$ObjectID[row]}))
+on conflict (md5(geom::TEXT)) do update
+    set trip_count = trip_map.trip_count + EXCLUDED.trip_count,
+        od_pairs   = trip_map.od_pairs || ', " ', '", ' || EXCLUDED.od_pairs;'
+      )
+    # print(insert_query)
+    DBI::dbGetQuery(main_con, insert_query)
+  }
+
+}
