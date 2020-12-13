@@ -85,7 +85,8 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
   theta_8 <- -0.748
   theta_9 <-  1.428 # (destination_charger Level_3)
   ASC_BEV <- 11.184
-  ev_range <- ev_range * config$SOC_LOWER_LIMIT / 100 # This is as some EVs can start with the lower SOC value
+  ev_range <-
+    ev_range * config$SOC_LOWER_LIMIT / 100 # This is as some EVs can start with the lower SOC value
   # Ideally change the above to min(SOC_LOWER_LIMIT, MAX_SOC) as after fast charge the vehicle may only go up-to 80% (MAX_SOC)
 
   # Probability calculation ------------------------------------------------
@@ -632,32 +633,38 @@ select sp_od2({origin}, {dest}) as line ) as sq"
 make_evses_now_table <- function(main_con, a_id = 1) {
   # Get all new EVSEs for the said analysis_id where we have some fast charger
   query_nevses <-
-    paste0("select * from new_evses where dcfc_plug_count > 0 and in_service = 'true' and analysis_id = ",
-           a_id)
+    paste0(
+      "select * from new_evses where dcfc_plug_count > 0 and in_service = 'true' and analysis_id = ",
+      a_id
+    )
 
   nevses <- DBI::dbGetQuery(main_con, query_nevses)
 
   # Get all the built evses
-  query_bevses <- "select * from built_evse where in_service = 'true'"
+  query_bevses <-
+    "select * from built_evse where in_service = 'true'"
 
   bevses <- DBI::dbGetQuery(main_con, query_bevses)
   # longitude, latitude, connector_code, dcfc_plug_count, dcfc_fixed_charging_price, dcfc_var_charging_price_unit, dcfc_var_charging_price, dcfc_fixed_parking_price, dcfc_var_parking_price_unit, dcfc_var_parking_price
   # Select the necessary columns and rows with DCFC, as we are collecting Level2 as well
   bevses <-
-    bevses[, c("bevse_id",
-               "longitude",
-               "latitude",
-               "connector_code",
-               "dcfc_count",
-               "dcfc_fixed_charging_price",
-               "dcfc_var_charging_price_unit",
-               "dcfc_var_charging_price",
-               "dcfc_fixed_parking_price",
-               "dcfc_var_parking_price_unit",
-               "dcfc_var_parking_price")] %>%
+    bevses[, c(
+      "bevse_id",
+      "longitude",
+      "latitude",
+      "connector_code",
+      "dcfc_count",
+      "dcfc_fixed_charging_price",
+      "dcfc_var_charging_price_unit",
+      "dcfc_var_charging_price",
+      "dcfc_fixed_parking_price",
+      "dcfc_var_parking_price_unit",
+      "dcfc_var_parking_price"
+    )] %>%
     dplyr::filter(.data$dcfc_count >= 1) %>%
     dplyr::filter(.data$connector_code == 1 |
-                    .data$connector_code == 2 | .data$connector_code == 3)
+                    .data$connector_code == 2 |
+                    .data$connector_code == 3)
 
   # bevses$dcfc_count <- NULL
 
@@ -667,17 +674,19 @@ make_evses_now_table <- function(main_con, a_id = 1) {
   evses_now$bevse_id <- NULL
 
   nevses <-
-    nevses[, c("nevse_id",
-               "latitude",
-               "longitude",
-               "dcfc_plug_count",
-               "connector_code",
-               "dcfc_fixed_charging_price",
-               "dcfc_var_charging_price_unit",
-               "dcfc_var_charging_price",
-               "dcfc_fixed_parking_price",
-               "dcfc_var_parking_price_unit",
-               "dcfc_var_parking_price")] %>%
+    nevses[, c(
+      "nevse_id",
+      "latitude",
+      "longitude",
+      "dcfc_plug_count",
+      "connector_code",
+      "dcfc_fixed_charging_price",
+      "dcfc_var_charging_price_unit",
+      "dcfc_var_charging_price",
+      "dcfc_fixed_parking_price",
+      "dcfc_var_parking_price_unit",
+      "dcfc_var_parking_price"
+    )] %>%
     dplyr::mutate(evse_id = paste0("n", .data$nevse_id)) %>%
     dplyr::rename(dcfc_count = dcfc_plug_count)
 
@@ -774,7 +783,9 @@ trip_gen <- function(num_days = 1,
 
   # These are the results of the EV trips generation from PJ
   wa_evtrips <-
-    DBI::dbGetQuery(main_con, "select wae.origin,
+    DBI::dbGetQuery(
+      main_con,
+      "select wae.origin,
        wae.destination,
        wae.ocars,
        wae.dcars,
@@ -792,7 +803,8 @@ from wa_evtrips wae
          left join (select count(veh_id), zip_code from wa_bevs where lower(make) <> 'tesla' group by zip_code) wabost
                    on wabost.zip_code = wae.origin
          left join (select count(veh_id), zip_code from wa_bevs where lower(make) <> 'tesla' group by zip_code) wabdst
-                   on wabdst.zip_code = wae.destination;")
+                   on wabdst.zip_code = wae.destination;"
+    )
   # browser()
   od_sp <-
     DBI::dbGetQuery(main_con, 'select * from od_sp')
@@ -825,8 +837,29 @@ from wa_evtrips wae
       )
     )$include_tesla
 
-  evses_now <-
-    make_evses_now_table(a_id = a_id, main_con = main_con)
+  # Check if evses_now table exists
+  evses_now_exists <- DBI::dbGetQuery(
+    main_con,
+    paste0(
+      "SELECT EXISTS (
+   SELECT FROM pg_catalog.pg_class c
+   JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+   WHERE  n.nspname = 'evse'
+   AND    c.relname = 'evses_now",
+      a_id,
+      "'
+   AND    c.relkind = 'r'    -- only tables
+   );"
+    )
+  )$exists
+
+  if (evses_now_exists) {
+    evses_now <-
+      DBI::dbGetQuery(main_con, paste0("select * from evse.evses_now", a_id))
+  } else {
+    evses_now <-
+      make_evses_now_table(a_id = a_id, main_con = main_con)
+  }
 
   # Check table data -------------------------
 
@@ -996,7 +1029,7 @@ from wa_evtrips wae
         if (EV_req_tots$returning_trips[i] > 0) {
           returning_counter <- 1
           nz_return_source <-
-            nz_return[nz_return$destination == EV_req_tots$source[i], ]
+            nz_return[nz_return$destination == EV_req_tots$source[i],]
           j <- 1
           for (j in 1:nrow(nz_return_source)) {
             # Find the number of trips between the OD pair
@@ -1059,7 +1092,7 @@ from wa_evtrips wae
                   trip_EVs_returning_g$veh_id[ii]
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_returning_row <-
-                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj], ]
+                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj],]
 
                 if (dim(trip_EV_returning_row)[1] == 0) {
 
@@ -1178,7 +1211,7 @@ from wa_evtrips wae
         if (EV_req_tots$departing_trips[i] > 0) {
           departing_counter <- 1
           nz_departure_source <-
-            nz_departure[nz_departure$origin == EV_req_tots$source[i], ]
+            nz_departure[nz_departure$origin == EV_req_tots$source[i],]
           for (j in 1:nrow(nz_departure_source)) {
             # Find the number of trips between the OD pair
             trip_count_OD <-
@@ -1248,7 +1281,7 @@ from wa_evtrips wae
 
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_departing_row <-
-                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj], ]
+                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj],]
 
                 if (dim(trip_EV_departing_row)[1] == 0) {
                   # browser()
