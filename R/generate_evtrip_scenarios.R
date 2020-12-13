@@ -130,7 +130,7 @@ vcdm_scdm4 <- function(ev_range, trip_row, config) {
 #'
 create_return_df <- function(od, od_sp, config) {
   # Input Validation --------------------------------------------------------
-
+  # browser()
   if (dim(od)[1] == 0) {
     stop('od has 0 rows - should have atleast 1')
   }
@@ -169,7 +169,7 @@ create_return_df <- function(od, od_sp, config) {
     stop('`CRITICAL_DISTANCE` should be of class numeric or integer')
   }
   if (!(class(config[['GLOBAL_SEED']]) == 'numeric' ||
-        config[['GLOBAL_SEED']] == 'integer')) {
+        class(config[['GLOBAL_SEED']]) == 'integer')) {
     stop('`GLOBAL_SEED` should be of class numeric or integer')
   }
   if (config[['CRITICAL_DISTANCE']] < 0) {
@@ -564,7 +564,7 @@ from
                from
                    (select longitude,
                            latitude
-                    from evses_now{a_id}
+                    from evse.evses_now{a_id}
                     where connector_code = {connector_code}
                         or connector_code = 3
                     union select longitude,
@@ -583,7 +583,7 @@ group by sq3.line;"
           "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing  from (
 select sq2.ratio - coalesce((lag(sq2.ratio) over (order by sq2.ratio)), 0) as delr, line from
 (select ST_LineLocatePoint(line, sq.points) as ratio, line from
-sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now{a_id}) as sq
+sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evse.evses_now{a_id}) as sq
 where st_dwithin(line::geography, sq.points::geography, 16093.4)
 order by ratio asc) as sq2) as sq3
 group by sq3.line;"
@@ -632,28 +632,34 @@ select sp_od2({origin}, {dest}) as line ) as sq"
 make_evses_now_table <- function(main_con, a_id = 1) {
   # Get all new EVSEs for the said analysis_id where we have some fast charger
   query_nevses <-
-    paste0("select * from new_evses where dcfc_plug_count > 0 and analysis_id = ",
+    paste0("select * from new_evses where dcfc_plug_count > 0 and in_service = 'true' and analysis_id = ",
            a_id)
 
   nevses <- DBI::dbGetQuery(main_con, query_nevses)
 
   # Get all the built evses
-  query_bevses <- "select * from built_evse"
+  query_bevses <- "select * from built_evse where in_service = 'true'"
 
   bevses <- DBI::dbGetQuery(main_con, query_bevses)
-
+  # longitude, latitude, connector_code, dcfc_plug_count, dcfc_fixed_charging_price, dcfc_var_charging_price_unit, dcfc_var_charging_price, dcfc_fixed_parking_price, dcfc_var_parking_price_unit, dcfc_var_parking_price
   # Select the necessary columns and rows with DCFC, as we are collecting Level2 as well
   bevses <-
     bevses[, c("bevse_id",
                "longitude",
                "latitude",
                "connector_code",
-               "dcfc_count")] %>%
+               "dcfc_count",
+               "dcfc_fixed_charging_price",
+               "dcfc_var_charging_price_unit",
+               "dcfc_var_charging_price",
+               "dcfc_fixed_parking_price",
+               "dcfc_var_parking_price_unit",
+               "dcfc_var_parking_price")] %>%
     dplyr::filter(.data$dcfc_count >= 1) %>%
     dplyr::filter(.data$connector_code == 1 |
                     .data$connector_code == 2 | .data$connector_code == 3)
 
-  bevses$dcfc_count <- NULL
+  # bevses$dcfc_count <- NULL
 
   # Join the two dataframes to create the EVSES now
   evses_now <-
@@ -664,15 +670,23 @@ make_evses_now_table <- function(main_con, a_id = 1) {
     nevses[, c("nevse_id",
                "latitude",
                "longitude",
-               "connector_code")] %>%
-    dplyr::mutate(evse_id = paste0("n", .data$nevse_id))
+               "dcfc_plug_count",
+               "connector_code",
+               "dcfc_fixed_charging_price",
+               "dcfc_var_charging_price_unit",
+               "dcfc_var_charging_price",
+               "dcfc_fixed_parking_price",
+               "dcfc_var_parking_price_unit",
+               "dcfc_var_parking_price")] %>%
+    dplyr::mutate(evse_id = paste0("n", .data$nevse_id)) %>%
+    dplyr::rename(dcfc_count = dcfc_plug_count)
 
   nevses$nevse_id <- NULL
 
   evses_now <- rbind(evses_now, nevses)
 
-  # Create a table with total evses
-  DBI::dbWriteTable(main_con, paste0("evses_now", a_id), evses_now, overwrite = TRUE)
+  # Create a table with total evses - in the evses schema
+  DBI::dbWriteTable(main_con, DBI::SQL(paste0("evse.", "evses_now", a_id)), evses_now, overwrite = TRUE)
   # Make a unique table for each analysis_id and drop it after the analysis is complete
 
   return(evses_now)
@@ -718,7 +732,7 @@ trip_gen <- function(num_days = 1,
     # a_id  <-  99
   }
 
-  # print(a_id)
+  print(config)
 
   # Database settings -------------------------------------------------------
 
@@ -1378,7 +1392,7 @@ from wa_evtrips wae
       "update analysis_record set sim_start_time = '{tst_df$trip_start_time}', status = 'trips_generated' where analysis_id = {a_id}"
     )
   DBI::dbGetQuery(main_con, query_status)
-  DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
+  # DBI::dbRemoveTable(main_con, paste0("evses_now", a_id))
   DBI::dbDisconnect(main_con)
 }
 

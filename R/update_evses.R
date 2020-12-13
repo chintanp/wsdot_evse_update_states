@@ -23,6 +23,21 @@ update_evses <- function() {
         ".log"
       )
     )))
+
+  if (!DBI::dbCanConnect(
+    RPostgres::Postgres(),
+    host = Sys.getenv("MAIN_HOST"),
+    dbname = Sys.getenv("MAIN_DB"),
+    user = Sys.getenv("MAIN_USER"),
+    password = Sys.getenv("MAIN_PWD"),
+    port = Sys.getenv("MAIN_PORT")
+  )) {
+    lg$log(level = "fatal",
+           msg = "Cannot connect to database",
+           "ip" = ipify::get_ip())
+    # Exit if DB cannot connect
+    stop("Cannot connect to database")
+  }
   # Database settings -------------------------------------------------------
 
   main_con <- DBI::dbConnect(
@@ -149,9 +164,11 @@ update_evses <- function() {
       )
     )
 
+  evse_dcfc_with_price_noNA$in_service <- TRUE
+
   lg$log(
     level = "info",
-    msg = paste("Count of WA_EVSEs nefore insert:  ", nrow(evse_dcfc_with_price_noNA)),
+    msg = paste("Count of WA_EVSEs before insert:  ", nrow(evse_dcfc_with_price_noNA)),
     "ip" = ipify::get_ip()
   )
 
