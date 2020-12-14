@@ -565,8 +565,8 @@ from
                from
                    (select longitude,
                            latitude
-                    from evse.evses_now{a_id}
-                    where connector_code = {connector_code}
+                    from evses_now
+                    where analysis_id = {a_id} and connector_code = {connector_code}
                         or connector_code = 3
                     union select longitude,
                                  latitude
@@ -584,7 +584,7 @@ group by sq3.line;"
           "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing  from (
 select sq2.ratio - coalesce((lag(sq2.ratio) over (order by sq2.ratio)), 0) as delr, line from
 (select ST_LineLocatePoint(line, sq.points) as ratio, line from
-sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evse.evses_now{a_id}) as sq
+sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now where analysis_id = {a_id}) as sq
 where st_dwithin(line::geography, sq.points::geography, 16093.4)
 order by ratio asc) as sq2) as sq3
 group by sq3.line;"
@@ -693,9 +693,10 @@ make_evses_now_table <- function(main_con, a_id = 1) {
   nevses$nevse_id <- NULL
 
   evses_now <- rbind(evses_now, nevses)
+  evses_now$analysis_id <- a_id
 
   # Create a table with total evses - in the evses schema
-  DBI::dbWriteTable(main_con, DBI::SQL(paste0("evse.", "evses_now", a_id)), evses_now, overwrite = TRUE)
+  DBI::dbAppendTable(main_con, "evses_now", evses_now)
   # Make a unique table for each analysis_id and drop it after the analysis is complete
 
   return(evses_now)
@@ -840,22 +841,14 @@ from wa_evtrips wae
   # Check if evses_now table exists
   evses_now_exists <- DBI::dbGetQuery(
     main_con,
-    paste0(
-      "SELECT EXISTS (
-   SELECT FROM pg_catalog.pg_class c
-   JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-   WHERE  n.nspname = 'evse'
-   AND    c.relname = 'evses_now",
-      a_id,
-      "'
-   AND    c.relkind = 'r'    -- only tables
-   );"
+    glue::glue(
+      'select exists(select 1 from evses_now where analysis_id = {a_id}) AS "exists";'
     )
   )$exists
 
   if (evses_now_exists) {
     evses_now <-
-      DBI::dbGetQuery(main_con, paste0("select * from evse.evses_now", a_id))
+      DBI::dbGetQuery(main_con, paste0("select * from evses_now where analysis_id = ", a_id))
   } else {
     evses_now <-
       make_evses_now_table(a_id = a_id, main_con = main_con)
