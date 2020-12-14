@@ -2,3 +2,4 @@
 ^\.Rproj\.user$
 logs/
 ^Dockerfile$
+R/make_evses_now_table.R
