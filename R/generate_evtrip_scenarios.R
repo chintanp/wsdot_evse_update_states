@@ -566,8 +566,8 @@ from
                    (select longitude,
                            latitude
                     from evses_now
-                    where analysis_id = {a_id} and connector_code = {connector_code}
-                        or connector_code = 3
+                    where analysis_id = {a_id} and (connector_code = {connector_code}
+                        or connector_code = 3)
                     union select longitude,
                                  latitude
                     from zipcode_record
