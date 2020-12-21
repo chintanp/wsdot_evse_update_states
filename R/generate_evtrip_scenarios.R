@@ -546,6 +546,7 @@ get_max_spacing <-
     if (!is.element(connector_code, c(1, 2, 4))) {
       stop('connector_code should be either 1, 2 or 4')
     }
+    # browser()
 
     # For non-tesla vehicles
     if (connector_code != 4) {
