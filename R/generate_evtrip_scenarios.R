@@ -156,8 +156,8 @@ create_return_df <- function(od, od_sp, config) {
   if (!('destination' %in% colnames(od_sp))) {
     stop('od_sp is missing the necessary column destination')
   }
-  if (!('shortest_path_length' %in% colnames(od_sp))) {
-    stop('od_sp is missing the necessary column shortest_path_length')
+  if (!('sp_len_ferry2' %in% colnames(od_sp))) {
+    stop('od_sp is missing the necessary column sp_len_ferry2')
   }
   if (is.null(config[['CRITICAL_DISTANCE']])) {
     stop('config is missing the field `CRITICAL_DISTANCE`')
@@ -212,7 +212,7 @@ create_return_df <- function(od, od_sp, config) {
 
   # Filter out OD pairs that are less than 70 miles apart
   return_distances_CD <-
-    return_distances %>% dplyr::filter(.data$shortest_path_length >= config$CRITICAL_DISTANCE)
+    return_distances %>% dplyr::filter(.data$sp_len_ferry2 >= config$CRITICAL_DISTANCE)
 
   # Filter out OD pairs with non-zero trips
   nz_return <-
@@ -225,7 +225,7 @@ create_return_df <- function(od, od_sp, config) {
 #' Create a dataframe that predicts the number of trips departing from origin to destination
 #'
 #' @param od A dataframe containing the results of the gravity model
-#' @param od_sp Dataframe containing OD and shortest_path_length
+#' @param od_sp Dataframe containing OD and sp_len_ferry2
 #' @param config constants
 #'
 #' @return A dataframe with column origin, destination, and
@@ -263,8 +263,8 @@ create_departure_df <- function(od, od_sp, config) {
   if (!('destination' %in% colnames(od_sp))) {
     stop('od_sp is missing the necessary column destination')
   }
-  if (!('shortest_path_length' %in% colnames(od_sp))) {
-    stop('od_sp is missing the necessary column shortest_path_length')
+  if (!('sp_len_ferry2' %in% colnames(od_sp))) {
+    stop('od_sp is missing the necessary column sp_len_ferry2')
   }
   if (is.null(config[['CRITICAL_DISTANCE']])) {
     stop('config is missing the field `CRITICAL_DISTANCE`')
@@ -307,7 +307,7 @@ create_departure_df <- function(od, od_sp, config) {
       by.y = c('origin', 'destination')
     )
   departure_distances_CD <-
-    departure_distances %>% dplyr::filter(.data$shortest_path_length >= config$CRITICAL_DISTANCE)
+    departure_distances %>% dplyr::filter(.data$sp_len_ferry2 >= config$CRITICAL_DISTANCE)
 
   nz_departure <-
     departure_distances_CD %>% dplyr::filter(.data$long_distance_departure_trips > 0)
@@ -506,7 +506,7 @@ make_trip_row <-
       connector_code = trip_EV_row$connector_code
     )
     trip_row <- data.frame(
-      dist = trip_sp$shortest_path_length,
+      dist = trip_sp$sp_len_ferry2,
       dest_charger_L2 = dest_charger_L2,
       dest_charger = dest_charger,
       max_spacing = max_spacing,
@@ -559,7 +559,7 @@ from
      from
          (select ST_LineLocatePoint(line, sqa.points) as ratio,
                  line
-          from sp_od2({origin}, {dest}) as line,
+          from sp_od_ferry({origin}, {dest}) as line,
 
               (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points
                from
@@ -584,7 +584,7 @@ group by sq3.line;"
           "select (max(delr) * st_length(line::geography) * 0.000621371) as max_spacing  from (
 select sq2.ratio - coalesce((lag(sq2.ratio) over (order by sq2.ratio)), 0) as delr, line from
 (select ST_LineLocatePoint(line, sq.points) as ratio, line from
-sp_od2({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now where analysis_id = {a_id}) as sq
+sp_od_ferry({origin}, {dest}) as line, (select st_setsrid(st_makepoint(longitude, latitude), 4326) as points from evses_now where analysis_id = {a_id}) as sq
 where st_dwithin(line::geography, sq.points::geography, 16093.4)
 order by ratio asc) as sq2) as sq3
 group by sq3.line;"
@@ -599,7 +599,7 @@ group by sq3.line;"
       query_sp <-
         glue::glue(
           "select (st_length(line::geography) * 0.000621371) as splen from (
-select sp_od2({origin}, {dest}) as line ) as sq"
+select sp_od_ferry({origin}, {dest}) as line ) as sq"
         )
 
       spl_df <- DBI::dbGetQuery(main_con, query_sp)
@@ -808,17 +808,17 @@ from wa_evtrips wae
     )
   # browser()
   od_sp <-
-    DBI::dbGetQuery(main_con, 'select * from od_sp')
+    DBI::dbGetQuery(main_con, 'select origin, destination, sp_len_ferry2 from od_sp')
 
-  od_cd <-
-    DBI::dbGetQuery(
-      main_con,
-      paste0(
-        'select origin, destination, min(cd_chademo) as cd_chademo, min(cd_combo) as cd_combo from od_cd where analysis_id = -1 or analysis_id =  ',
-        a_id,
-        ' group by origin, destination;'
-      )
-    )
+  # od_cd <-
+  #   DBI::dbGetQuery(
+  #     main_con,
+  #     paste0(
+  #       'select origin, destination, min(cd_chademo) as cd_chademo, min(cd_combo) as cd_combo from od_cd where analysis_id = -1 or analysis_id =  ',
+  #       a_id,
+  #       ' group by origin, destination;'
+  #     )
+  #   )
 
   dest_charger <- DBI::dbGetQuery(
     main_con,
@@ -901,7 +901,7 @@ from wa_evtrips wae
 
   # Make all NA distances to zero, since we wont be able to traverse on them avayway
   # EVentually we filter all OD pairs where the distance is less than a threshold
-  od_sp$shortest_path_length[which(is.na(od_sp$shortest_path_length))] <-
+  od_sp$sp_len_ferry2[which(is.na(od_sp$sp_len_ferry2))] <-
     0
 
   returning_counter <- 0
@@ -1106,7 +1106,7 @@ from wa_evtrips wae
                   dest_charger %>% dplyr::filter(.data$zip == destination_zip)
                 # Find the distance for the OD pair
                 dist <-
-                  trip_sp_ret$shortest_path_length
+                  trip_sp_ret$sp_len_ferry2
 
                 # Find the possible trip time rounded to hours and subtract from `det`
                 # This means that a trip can start anywhere where trip start time and end
@@ -1294,7 +1294,7 @@ from wa_evtrips wae
                   dest_charger %>% dplyr::filter(.data$zip == destination_zip)
                 # Find the distance for the OD pair
                 dist <-
-                  trip_sp_dep$shortest_path_length
+                  trip_sp_dep$sp_len_ferry2
                 # Find a start time that includes this trip time
 
                 trip_time <-
