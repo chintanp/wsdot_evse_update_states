@@ -17,10 +17,11 @@ rnd_date_time <-
            et = "2019/07/02",
            tz = "America/Los_Angeles",
            config) {
+    # browser()
     st <- as.POSIXct(st, tz = tz)
     et <- as.POSIXct(et, tz = tz)
     dt <- as.numeric(difftime(et, st, units = "secs"))
-    set.seed(config[['GLOBAL_SEED']])
+    # set.seed(config[['GLOBAL_SEED']])
     ev <- sort(stats::runif(N, 0, dt))
     rt <-
       lubridate::as_datetime(st + ev, tz = "America/Los_Angeles")
@@ -181,12 +182,12 @@ create_return_df <- function(od, od_sp, config) {
   }
 
   # Assignment --------------------------------------------------------------
-  set.seed(config[['GLOBAL_SEED']])
+  # set.seed(config[['GLOBAL_SEED']])
   # random draw from Poisson distribution
   daily_counts_ret <-
     stats::rpois(dim(od)[1], od$ret_calib_daily)
 
-  set.seed(config[['GLOBAL_SEED']])
+  # set.seed(config[['GLOBAL_SEED']])
   # Draw from a binomial distro
   evtrips_ret <-
     mapply(stats::rbinom, 1, daily_counts_ret, od$devs / od$dcars)
@@ -279,12 +280,12 @@ create_departure_df <- function(od, od_sp, config) {
 
   # Assignment -----------------------------
 
-  set.seed(config[['GLOBAL_SEED']])
+  # set.seed(config[['GLOBAL_SEED']])
 
   daily_counts_dep <-
     stats::rpois(dim(od)[1], od$dep_calib_daily)   #random draw from Poisson distribution
 
-  set.seed(config[['GLOBAL_SEED']])
+  # set.seed(config[['GLOBAL_SEED']])
   # Draw from a binomial distro
   evtrips_dep <-
     mapply(stats::rbinom, 1, daily_counts_dep, od$oevs / od$ocars)
@@ -347,7 +348,7 @@ get_tripEVs_from_sourceEVs <-
 
     }
 
-    set.seed(config[['GLOBAL_SEED']])
+    # set.seed(config[['GLOBAL_SEED']])
 
     # Randomly pick EVs from the relevant EVs "without replacement"
     trip_EVs <-
@@ -1046,7 +1047,7 @@ from wa_evtrips wae
 
                 # 9.2 Randomly assign SOCs to these vehicles -----
                 #      with replacement
-                set.seed(config[['GLOBAL_SEED']])
+                # set.seed(config[['GLOBAL_SEED']])
                 trip_EVs_returning_OD$soc <-
                   base::sample(
                     config$SOC_LOWER_LIMIT:config$SOC_UPPER_LIMIT,
@@ -1157,7 +1158,7 @@ from wa_evtrips wae
 
                 # print(prob_ij)
 
-                set.seed(config[['GLOBAL_SEED']])
+                # set.seed(config[['GLOBAL_SEED']])
                 # Make a random draw based on this probability
                 ret_vehicle_choice <-
                   stats::rbinom(1, 1, prob_ij_bev)
@@ -1341,7 +1342,7 @@ from wa_evtrips wae
 
                 # print(prob_ij)
 
-                set.seed(config[['GLOBAL_SEED']])
+                # set.seed(config[['GLOBAL_SEED']])
 
                 dep_vehicle_choice <-
                   stats::rbinom(1, 1, prob_ij_bev)

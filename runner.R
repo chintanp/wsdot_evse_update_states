@@ -54,6 +54,7 @@ where ap.analysis_id = {a_id};"))
   config[['LOOKUP_DISTANCE']] <- as.numeric(analysis_params$param_value[analysis_params$param_name == 'lookup_distance_miles'])
 
   # browser()
+  set.seed(config[['GLOBAL_SEED']])
 
   tripgen::update_dc(a_id)
 
