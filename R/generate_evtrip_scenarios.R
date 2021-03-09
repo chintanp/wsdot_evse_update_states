@@ -633,6 +633,7 @@ select sp_od_ferry({origin}, {dest}) as line ) as sq"
 #' @importFrom rlang .data
 #'
 make_evses_now_table <- function(main_con, a_id = 1) {
+
   # Get all new EVSEs for the said analysis_id where we have some fast charger
   query_nevses <-
     paste0(
@@ -668,12 +669,6 @@ make_evses_now_table <- function(main_con, a_id = 1) {
                     .data$connector_code == 2 |
                     .data$connector_code == 3)
 
-  # bevses$dcfc_count <- NULL
-
-  # Join the two dataframes to create the EVSES now
-  evses_now <-
-    bevses %>% dplyr::mutate(evse_id = paste0("b", .data$bevse_id))
-  evses_now$bevse_id <- NULL
 
   nevses <-
     nevses[, c(
@@ -687,12 +682,36 @@ make_evses_now_table <- function(main_con, a_id = 1) {
       "dcfc_var_charging_price",
       "dcfc_fixed_parking_price",
       "dcfc_var_parking_price_unit",
-      "dcfc_var_parking_price"
+      "dcfc_var_parking_price",
+      "station_type",
+      "comments"
     )] %>%
-    dplyr::mutate(evse_id = paste0("n", .data$nevse_id)) %>%
     dplyr::rename(dcfc_count = dcfc_plug_count)
 
-  nevses$nevse_id <- NULL
+  upgraded_chargers <-
+    nevses %>% dplyr::filter(station_type == 'upgrade') %>%
+    dplyr::mutate(
+      bevse_id = as.numeric(comments),
+      nevse_id = NULL,
+      comments = NULL,
+      station_type = NULL
+    ) %>% dplyr::select(bevse_id, dcfc_count)
+
+  # Add the count of upgraded chargers to the appropriate existing charger
+  # This does not carry forward the pricing data currently, only the count of
+  # fast charging plugs (dcfc_count)
+
+  evses_now <- bevses %>% dplyr::left_join(upgraded_chargers, by = "bevse_id") %>%
+    dplyr::mutate(dcfc_count.y = tidyr::replace_na(dcfc_count.y, 0)) %>%
+    dplyr::mutate(dcfc_count = dcfc_count.x + dcfc_count.y) %>%
+    dplyr::mutate(dcfc_count.x = NULL, dcfc_count.y = NULL, evse_id = paste0("b", .data$bevse_id))
+
+  # browser()
+  evses_now$bevse_id <- NULL
+
+  nevses <- nevses %>% dplyr::filter(station_type == 'new') %>%
+    dplyr::mutate(evse_id = paste0("n", .data$nevse_id)) %>%
+    dplyr::mutate(nevse_id = NULL, station_type = NULL, comments = NULL)
 
   evses_now <- rbind(evses_now, nevses)
   evses_now$analysis_id <- a_id
@@ -810,7 +829,8 @@ from wa_evtrips wae
     )
   # browser()
   od_sp <-
-    DBI::dbGetQuery(main_con, 'select origin, destination, sp_len_ferry2 from od_sp')
+    DBI::dbGetQuery(main_con,
+                    'select origin, destination, sp_len_ferry2 from od_sp')
 
   # od_cd <-
   #   DBI::dbGetQuery(
@@ -850,7 +870,8 @@ from wa_evtrips wae
 
   if (evses_now_exists) {
     evses_now <-
-      DBI::dbGetQuery(main_con, paste0("select * from evses_now where analysis_id = ", a_id))
+      DBI::dbGetQuery(main_con,
+                      paste0("select * from evses_now where analysis_id = ", a_id))
   } else {
     evses_now <-
       make_evses_now_table(a_id = a_id, main_con = main_con)
@@ -1024,7 +1045,7 @@ from wa_evtrips wae
         if (EV_req_tots$returning_trips[i] > 0) {
           returning_counter <- 1
           nz_return_source <-
-            nz_return[nz_return$destination == EV_req_tots$source[i],]
+            nz_return[nz_return$destination == EV_req_tots$source[i], ]
           j <- 1
           for (j in 1:nrow(nz_return_source)) {
             # Find the number of trips between the OD pair
@@ -1087,7 +1108,7 @@ from wa_evtrips wae
                   trip_EVs_returning_g$veh_id[ii]
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_returning_row <-
-                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj],]
+                  trip_EVs_returning[which(trip_EVs_returning$veh_id == EV_id)[jj], ]
 
                 if (dim(trip_EV_returning_row)[1] == 0) {
 
@@ -1206,7 +1227,7 @@ from wa_evtrips wae
         if (EV_req_tots$departing_trips[i] > 0) {
           departing_counter <- 1
           nz_departure_source <-
-            nz_departure[nz_departure$origin == EV_req_tots$source[i],]
+            nz_departure[nz_departure$origin == EV_req_tots$source[i], ]
           for (j in 1:nrow(nz_departure_source)) {
             # Find the number of trips between the OD pair
             trip_count_OD <-
@@ -1276,7 +1297,7 @@ from wa_evtrips wae
 
                 # Find the corresponding OD pair, and trip distance
                 trip_EV_departing_row <-
-                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj],]
+                  trip_EVs_departing[which(trip_EVs_departing$veh_id == EV_id)[jj], ]
 
                 if (dim(trip_EV_departing_row)[1] == 0) {
                   # browser()
