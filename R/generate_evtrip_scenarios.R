@@ -633,7 +633,6 @@ select sp_od_ferry({origin}, {dest}) as line ) as sq"
 #' @importFrom rlang .data
 #'
 make_evses_now_table <- function(main_con, a_id = 1) {
-
   # Get all new EVSEs for the said analysis_id where we have some fast charger
   query_nevses <-
     paste0(
@@ -688,6 +687,7 @@ make_evses_now_table <- function(main_con, a_id = 1) {
     )] %>%
     dplyr::rename(dcfc_count = dcfc_plug_count)
 
+  browser()
   upgraded_chargers <-
     nevses %>% dplyr::filter(station_type == 'upgrade') %>%
     dplyr::mutate(
@@ -695,23 +695,72 @@ make_evses_now_table <- function(main_con, a_id = 1) {
       nevse_id = NULL,
       comments = NULL,
       station_type = NULL
-    ) %>% dplyr::select(bevse_id, dcfc_count)
+    ) %>% dplyr::select(bevse_id, dcfc_count, connector_code)
+
+  bevses_joined <-
+    bevses %>% dplyr::left_join(upgraded_chargers, by = "bevse_id") %>%
+    dplyr::mutate(connector_code = connector_code.x)
+
+  for (uc in rownames(upgraded_chargers)) {
+    eid <- upgraded_chargers[uc, ]$bevse_id
+    old_code <-
+      bevses_joined[which(bevses_joined$bevse_id == eid),]$connector_code.x
+    upgrade_code <-
+      bevses_joined[which(bevses_joined$bevse_id == eid),]$connector_code.y
+    if (old_code == 1) {
+      if (upgrade_code == 3) {
+        new_code <-  3
+
+      } else if (upgrade_code == 2) {
+        new_code <- 3
+
+      } else {
+        new_code <- old_code
+
+      }
+    } else if (old_code == 2) {
+      if (upgrade_code == 3) {
+        new_code <-  3
+
+      } else if (upgrade_code == 1) {
+        new_code <- 3
+
+      } else {
+        new_code <- old_code
+
+      }
+    } else if (old_code == 3) {
+      new_code <- old_code
+
+    }
+    # new_dcfc_count <- max(new_dcfc_chademo_count, new_dcfc_combo_count)
+    bevses_joined[which(bevses_joined$bevse_id == eid),]$connector_code <-
+      new_code
+  }
 
   # Add the count of upgraded chargers to the appropriate existing charger
   # This does not carry forward the pricing data currently, only the count of
   # fast charging plugs (dcfc_count)
 
-  evses_now <- bevses %>% dplyr::left_join(upgraded_chargers, by = "bevse_id") %>%
+  evses_now <- bevses_joined %>%
     dplyr::mutate(dcfc_count.y = tidyr::replace_na(dcfc_count.y, 0)) %>%
     dplyr::mutate(dcfc_count = dcfc_count.x + dcfc_count.y) %>%
-    dplyr::mutate(dcfc_count.x = NULL, dcfc_count.y = NULL, evse_id = paste0("b", .data$bevse_id))
+    dplyr::mutate(
+      dcfc_count.x = NULL,
+      dcfc_count.y = NULL,
+      connector_code.x = NULL,
+      connector_code.y = NULL,
+      evse_id = paste0("b", .data$bevse_id)
+    )
 
   # browser()
   evses_now$bevse_id <- NULL
 
   nevses <- nevses %>% dplyr::filter(station_type == 'new') %>%
     dplyr::mutate(evse_id = paste0("n", .data$nevse_id)) %>%
-    dplyr::mutate(nevse_id = NULL, station_type = NULL, comments = NULL)
+    dplyr::mutate(nevse_id = NULL,
+                  station_type = NULL,
+                  comments = NULL)
 
   evses_now <- rbind(evses_now, nevses)
   evses_now$analysis_id <- a_id
