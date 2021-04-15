@@ -687,7 +687,7 @@ make_evses_now_table <- function(main_con, a_id = 1) {
     )] %>%
     dplyr::rename(dcfc_count = dcfc_plug_count)
 
-  browser()
+  # browser()
   upgraded_chargers <-
     nevses %>% dplyr::filter(station_type == 'upgrade') %>%
     dplyr::mutate(
