@@ -846,12 +846,15 @@ trip_gen <- function(num_days = 1,
 
   # gas prices in WA
   wa_gas_prices <-
-    DBI::dbGetQuery(main_con, 'select * from wa_gas_prices')
+    DBI::dbGetQuery(main_con, 'select * from wa_gas_prices order by zip;')
 
   wa_bevs <-
     DBI::dbGetQuery(main_con,
-                    "select veh_id, range_fe, zip_code, connector_code, make from wa_bevs")
+                    "select veh_id, range_fe, zip_code, connector_code, make from wa_bevs order by veh_id;")
 
+  lg$log(level = "info",
+                msg = paste0("Data in wa_gas_prices: ", head(wa_gas_prices)),
+                "ip" = ipify::get_ip())
   # These are the results of the EV trips generation from PJ
   wa_evtrips <-
     DBI::dbGetQuery(
@@ -874,12 +877,23 @@ from wa_evtrips wae
          left join (select count(veh_id), zip_code from wa_bevs where lower(make) <> 'tesla' group by zip_code) wabost
                    on wabost.zip_code = wae.origin
          left join (select count(veh_id), zip_code from wa_bevs where lower(make) <> 'tesla' group by zip_code) wabdst
-                   on wabdst.zip_code = wae.destination;"
+                   on wabdst.zip_code = wae.destination
+order by (origin, destination);"
     )
+
+  lg$log(level = "info",
+         msg = paste0("Data in wa_evtrips: ", head(wa_evtrips)),
+         "ip" = ipify::get_ip())
+
   # browser()
   od_sp <-
-    DBI::dbGetQuery(main_con,
-                    'select origin, destination, sp_len_ferry2 from od_sp')
+    DBI::dbGetQuery(main_con, 'select origin, destination, sp_len_ferry2
+from od_sp
+order by (origin, destination);')
+
+  lg$log(level = "info",
+         msg = paste0("Data in od_sp: ", head(od_sp)),
+         "ip" = ipify::get_ip())
 
   # od_cd <-
   #   DBI::dbGetQuery(
@@ -896,9 +910,13 @@ from wa_evtrips wae
     paste0(
       'select zip, bool_or(dc_chademo) as dc_chademo, bool_or(dc_combo) as dc_combo, bool_or(dc_level2) as dc_level2 from dest_charger where analysis_id = -1 or analysis_id =  ',
       a_id,
-      ' group by zip;'
+      ' group by zip order by zip;'
     )
   )
+
+  lg$log(level = "info",
+         msg = paste0("Data in dest_charger: ", head(dest_charger)),
+         "ip" = ipify::get_ip())
 
   include_tesla_flag <-
     DBI::dbGetQuery(
@@ -909,6 +927,10 @@ from wa_evtrips wae
       )
     )$include_tesla
 
+  lg$log(level = "info",
+         msg = paste0("Data in include_tesla_flag: ", head(include_tesla_flag)),
+         "ip" = ipify::get_ip())
+
   # Check if evses_now table exists
   evses_now_exists <- DBI::dbGetQuery(
     main_con,
@@ -917,10 +939,18 @@ from wa_evtrips wae
     )
   )$exists
 
+  lg$log(level = "info",
+         msg = paste0("Data in evses_now_exists: ", head(evses_now_exists)),
+         "ip" = ipify::get_ip())
+
   if (evses_now_exists) {
     evses_now <-
       DBI::dbGetQuery(main_con,
-                      paste0("select * from evses_now where analysis_id = ", a_id))
+                      paste0("select * from evses_now where analysis_id = ", a_id, " order by evse_id;"))
+
+    lg$log(level = "info",
+           msg = paste0("Data in evses_now: ", head(evses_now)),
+           "ip" = ipify::get_ip())
   } else {
     evses_now <-
       make_evses_now_table(a_id = a_id, main_con = main_con)
@@ -961,9 +991,18 @@ from wa_evtrips wae
     wa_evtrips$oevs  <- NULL
     wa_evtrips$devs  <- NULL
     wa_evtrips <-
-      wa_evtrips %>% dplyr::rename(oevs = oevs_no_tesla, devs = devs_no_tesla)
+      wa_evtrips %>% dplyr::rename(oevs = oevs_no_tesla, devs = devs_no_tesla) %>%
+      dplyr::arrange(origin, destination)
+
+    lg$log(level = "info",
+           msg = paste0("Data in wa_evtrips: ", head(wa_evtrips)),
+           "ip" = ipify::get_ip())
     wa_bevs <-
       wa_bevs %>% dplyr::filter(!grepl("tesla", make, ignore.case = TRUE)) # ~ 16000
+
+    lg$log(level = "info",
+           msg = paste0("Data in wa_bevs: ", head(wa_bevs)),
+           "ip" = ipify::get_ip())
   }
 
   # 1. Calculate trip generation rate -----------
